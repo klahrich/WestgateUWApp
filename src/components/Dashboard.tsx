@@ -52,6 +52,7 @@ export const Dashboard: React.FC = () => {
   });
   const [loans, setLoans] = useState<LoanData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dataRefreshing, setDataRefreshing] = useState(false); // Separate state for refreshing data
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(USE_MOCK_DATA);
 
@@ -60,7 +61,12 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
+        // Use loading for initial load, dataRefreshing for subsequent updates
+        if (loans.length === 0) {
+          setLoading(true);
+        } else {
+          setDataRefreshing(true);
+        }
         setError(null);
         
         if (USE_MOCK_DATA) {
@@ -143,6 +149,7 @@ export const Dashboard: React.FC = () => {
         setError(err instanceof Error ? err.message : 'Failed to fetch loan data');
       } finally {
         setLoading(false);
+        setDataRefreshing(false);
       }
     };
 
@@ -311,9 +318,14 @@ export const Dashboard: React.FC = () => {
             <div className="flex items-center space-x-6">
               <div className="text-right">
                 <p className="text-sm text-gray-400">Analysis Period</p>
-                <p className="text-sm font-medium text-gray-200">
-                  {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
-                </p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium text-gray-200">
+                    {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+                  </p>
+                  {dataRefreshing && (
+                    <div className="animate-spin h-3 w-3 border-b-2 border-cyan-400 rounded-full"></div>
+                  )}
+                </div>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-400">Total Records</p>
@@ -427,6 +439,7 @@ export const Dashboard: React.FC = () => {
               <DateRangePicker
                 dateRange={dateRange}
                 onChange={setDateRange}
+                loading={dataRefreshing}
               />
             </div>
 
