@@ -1,0 +1,64 @@
+# Project State (as of 2025-07-04): Westgate Lending Analytics Dashboard
+
+## 1. Main Goal
+
+The primary goal of this project is to provide a dashboard for visualizing and analyzing loan data, focusing on default and refusal risk scores, historical decisions, and simulating the impact of different risk thresholds on loan acceptance rates.
+
+## 2. Core Features Implemented So Far
+
+- Fetching loan data from a Supabase database, including pagination to retrieve all records within a selected date range.
+- Displaying key aggregate statistics (Total Loans, Accepted, Refused, Accept Rate).
+- Presenting monthly trends of loan decisions through charts and tables.
+- Three analysis modes:
+  - **Historical Analysis**: Shows actual historical loan decisions from the database.
+  - **Simulation Mode**: Allows users to adjust Default and Refusal Score thresholds to see the simulated impact on acceptance/refusal rates.
+  - **Threshold Grid Analysis**: Visualizes the Accept Rate across a 2D grid of varying Default and Refusal Score thresholds (0.00 to 1.00 in 0.05 increments) using color formatting (heatmap style).
+- Interactive Threshold Grid cells: Clicking a cell in the Threshold Grid sets the corresponding Default and Refusal thresholds and automatically switches the view to Simulation Mode.
+- Date range filtering for all analysis modes, with a custom date range picker component.
+- Visual loading indicators: A full-screen loader for initial data fetch and a subtle overlay/cursor indicator for data refreshing triggered by date range changes.
+
+## 3. Technologies/Frameworks Used
+
+- React (with Hooks: `useState`, `useEffect`, `useMemo`)
+- TypeScript
+- Supabase (for database interaction and data fetching)
+- Tailwind CSS (for styling)
+- Lucide React (for icons)
+
+## 4. Key Files and Their Roles
+
+- [`src/components/Dashboard.tsx`](src/components/Dashboard.tsx): The main application component. Manages global state (view mode, date range, thresholds, loading), orchestrates data fetching from Supabase, performs client-side data processing (filtering, aggregation), and renders the appropriate view (Historical, Simulation, Threshold Grid) and shared controls.
+- [`src/lib/supabase.ts`](src/lib/supabase.ts): Configures the Supabase client and defines the `LoanRecord` TypeScript interface for data structure.
+- [`src/components/DateRangePicker.tsx`](src/components/DateRangePicker.tsx): Component for selecting start and end dates. Includes standard date inputs and "Quick Select" buttons. Modified to include separate year/month/day selectors for more granular control and displays a loading cursor when data is refreshing.
+- [`src/components/ThresholdMatrix.tsx`](src/components/ThresholdMatrix.tsx): New component responsible for computing and rendering the 2D grid visualization of Accept Rate based on varying thresholds. Handles cell clicks to trigger threshold updates in the Dashboard component and highlights the currently selected cell.
+- [`src/config/dataSource.ts`](src/config/dataSource.ts): Contains configuration for using mock data and the mock data generation logic.
+- Other components (`MetricsCard.tsx`, `MonthlyChart.tsx`, `StatsTable.tsx`, `ThresholdControls.tsx`) handle specific UI elements within the dashboard views.
+
+## 5. Database Schema
+
+The main table used is `logs` in Supabase, with the following relevant columns:
+
+| Column Name      | Type                | Description                                 |
+|------------------|---------------------|---------------------------------------------|
+| id               | integer/uuid        | Primary key                                 |
+| created_at       | timestamptz         | Timestamp of loan record creation           |
+| default_score    | float (nullable)    | Model's default risk score                  |
+| refusal_score    | float (nullable)    | Model's refusal risk score                  |
+| decision         | string (nullable)   | Historical decision (e.g., "accept", "refuse") |
+| organization     | string (nullable)   | Organization associated with the loan       |
+| info             | string (nullable)   | Additional info (JSON or text)              |
+
+- The dashboard queries only records where `default_score` and `refusal_score` are not null.
+- Date filtering is performed on the `created_at` column using ISO 8601 strings and Supabase's `.gte()` and `.lte()` query methods.
+- The schema is reflected in the `LoanRecord` TypeScript interface in `src/lib/supabase.ts`.
+
+## 6. What I Was Working on Last, and Next Planned Steps
+
+- **Last Work**: Improved the visibility of the threshold labels (row and column headers) in the Threshold Grid table by changing their text color from black to a subtle cyan.
+- **Next Planned Steps**: The last requested change was completed. The project is ready for your next instruction. Potential next steps could involve refining the UI/UX further, adding more metrics to the Threshold Grid (e.g., Refuse Rate), or implementing additional analysis features.
+
+## 7. Context Needed to Understand Tricky Parts or Design Decisions
+
+- **Date Handling**: Initial issues with date filtering were resolved by implementing server-side filtering in the Supabase query using ISO 8601 formatted dates (`gte`, `lte`) and ensuring the date range includes the full start and end days. Pagination was added to overcome the default Supabase record limit. The `DateRangePicker` was enhanced with individual selectors to address the native date picker's behavior of auto-selecting a day when the month changes.
+- **Loading States**: Two distinct loading states (`loading` and `dataRefreshing`) were introduced to differentiate between the initial full-page load and subsequent data fetches (like changing the date range), allowing for different visual feedback mechanisms (full-screen loader vs. subtle overlay/cursor).
+- **Threshold Grid Interaction**: The decision to make grid cells clickable provides a direct and intuitive way for users to explore the impact of different thresholds and immediately see the results in the Simulation mode, enhancing the analytical workflow. Highlighting the selected cell provides clear visual context.

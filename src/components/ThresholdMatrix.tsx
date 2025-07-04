@@ -5,9 +5,17 @@ interface ThresholdMatrixProps {
     default_score: number;
     refusal_score: number;
   }>;
+  onSelectThresholds?: (defaultThreshold: number, refusalThreshold: number) => void;
+  selectedDefaultThreshold?: number;
+  selectedRefusalThreshold?: number;
 }
 
-export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({ loans }) => {
+export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({
+  loans,
+  onSelectThresholds,
+  selectedDefaultThreshold,
+  selectedRefusalThreshold
+}) => {
   // Generate threshold values from 0 to 1 with step 0.05
   const thresholds = useMemo(() => {
     const values: number[] = [];
@@ -67,20 +75,22 @@ export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({ loans }) => {
   return (
     <div className="overflow-auto">
       <div className="text-sm text-gray-400 mb-4">
-        This grid shows the Accept Rate for different threshold combinations. 
+        This grid shows the Accept Rate for different threshold combinations.
         <br />
         X-axis: Default Score Threshold, Y-axis: Refusal Score Threshold
+        <br />
+        <span className="text-cyan-400 font-medium">Click any cell to set thresholds and switch to Simulation Mode</span>
       </div>
       
       <div className="relative overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr>
-              <th className="p-2 bg-gray-800 sticky left-0 top-0 z-10">
+              <th className="p-2 bg-gray-800 sticky left-0 top-0 z-10 text-cyan-300 font-medium">
                 Default ↓ / Refusal →
               </th>
               {thresholds.map((threshold) => (
-                <th key={`header-${threshold}`} className="p-2 bg-gray-800 sticky top-0">
+                <th key={`header-${threshold}`} className="p-2 bg-gray-800 sticky top-0 text-cyan-300/80 font-medium">
                   {threshold.toFixed(2)}
                 </th>
               ))}
@@ -89,15 +99,20 @@ export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({ loans }) => {
           <tbody>
             {matrixData.map((row, rowIndex) => (
               <tr key={`row-${rowIndex}`}>
-                <th className="p-2 bg-gray-800 sticky left-0">
+                <th className="p-2 bg-gray-800 sticky left-0 text-cyan-300/80 font-medium">
                   {thresholds[rowIndex].toFixed(2)}
                 </th>
                 {row.map((acceptRate, colIndex) => (
-                  <td 
+                  <td
                     key={`cell-${rowIndex}-${colIndex}`}
                     style={{ backgroundColor: getColorForRate(acceptRate) }}
-                    className="p-2 text-center font-medium border border-gray-700/30"
+                    className={`p-2 text-center font-medium border cursor-pointer transition-all duration-200
+                      ${thresholds[rowIndex] === selectedDefaultThreshold && thresholds[colIndex] === selectedRefusalThreshold
+                        ? 'border-white border-2 shadow-lg scale-105 z-10'
+                        : 'border-gray-700/30 hover:border-gray-500'
+                      }`}
                     title={`Default: ${thresholds[rowIndex].toFixed(2)}, Refusal: ${thresholds[colIndex].toFixed(2)}, Accept Rate: ${formatPercent(acceptRate)}`}
+                    onClick={() => onSelectThresholds && onSelectThresholds(thresholds[rowIndex], thresholds[colIndex])}
                   >
                     {formatPercent(acceptRate)}
                   </td>

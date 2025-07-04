@@ -47,6 +47,7 @@ export const Dashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('historical');
   const [defaultThreshold, setDefaultThreshold] = useState(0.7);
   const [refusalThreshold, setRefusalThreshold] = useState(0.6);
+  const [selectedGridThresholds, setSelectedGridThresholds] = useState<{default: number, refusal: number} | null>(null);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), 0, 1),
     end: new Date()
@@ -262,6 +263,19 @@ export const Dashboard: React.FC = () => {
     console.log('Monthly stats:', monthlyStatsArray);
     return monthlyStatsArray;
   }, [currentDecisions]);
+
+  // Handle threshold selection from the grid
+  const handleGridThresholdSelect = (defaultThreshold: number, refusalThreshold: number) => {
+    // Set the thresholds
+    setDefaultThreshold(defaultThreshold);
+    setRefusalThreshold(refusalThreshold);
+    
+    // Store the selected thresholds for highlighting in the grid
+    setSelectedGridThresholds({ default: defaultThreshold, refusal: refusalThreshold });
+    
+    // Switch to simulation mode
+    setViewMode('simulation');
+  };
 
   if (loading) {
     return (
@@ -489,7 +503,12 @@ export const Dashboard: React.FC = () => {
                   {filteredLoans.length.toLocaleString()} loans analyzed
                 </div>
               </div>
-              <ThresholdMatrix loans={filteredLoans} />
+              <ThresholdMatrix
+                loans={filteredLoans}
+                onSelectThresholds={handleGridThresholdSelect}
+                selectedDefaultThreshold={selectedGridThresholds?.default}
+                selectedRefusalThreshold={selectedGridThresholds?.refusal}
+              />
             </div>
           </div>
         ) : (
@@ -516,12 +535,40 @@ export const Dashboard: React.FC = () => {
                     <Settings className="h-5 w-5 text-purple-400" />
                     <h2 className="text-lg font-semibold text-gray-100">Risk Thresholds</h2>
                   </div>
-                  <ThresholdControls
-                    defaultThreshold={defaultThreshold}
-                    refusalThreshold={refusalThreshold}
-                    onDefaultChange={setDefaultThreshold}
-                    onRefusalChange={setRefusalThreshold}
-                  />
+                  <div className="space-y-4">
+                    <ThresholdControls
+                      defaultThreshold={defaultThreshold}
+                      refusalThreshold={refusalThreshold}
+                      onDefaultChange={(value) => {
+                        setDefaultThreshold(value);
+                        // Clear selected grid thresholds when manually adjusted
+                        if (selectedGridThresholds && selectedGridThresholds.default !== value) {
+                          setSelectedGridThresholds(null);
+                        }
+                      }}
+                      onRefusalChange={(value) => {
+                        setRefusalThreshold(value);
+                        // Clear selected grid thresholds when manually adjusted
+                        if (selectedGridThresholds && selectedGridThresholds.refusal !== value) {
+                          setSelectedGridThresholds(null);
+                        }
+                      }}
+                    />
+                    
+                    {selectedGridThresholds && (
+                      <div className="mt-4 p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                        <p className="text-xs text-cyan-300 font-medium">
+                          <span className="flex items-center space-x-1">
+                            <BarChart3 className="h-3 w-3" />
+                            <span>Thresholds set from Grid Analysis</span>
+                          </span>
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          You can adjust the sliders above to fine-tune the thresholds.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
