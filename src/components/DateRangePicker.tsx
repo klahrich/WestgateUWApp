@@ -44,8 +44,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3">
+    <div className="space-y-4" style={{ cursor: loading ? 'wait' : 'default' }}>
+      <div className="space-y-3" style={{ cursor: loading ? 'wait' : 'default' }}>
         <div>
           <label className="text-sm font-medium text-gray-200 block mb-2">
             Start Date
@@ -53,8 +53,9 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           <input
             type="date"
             value={formatDateForInput(dateRange.start)}
-            onChange={handleStartDateChange}
-            className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm text-gray-200 backdrop-blur-sm"
+            onChange={!loading ? handleStartDateChange : undefined}
+            disabled={loading}
+            className={`w-full px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm text-gray-200 backdrop-blur-sm ${loading ? 'opacity-70 cursor-wait' : ''}`}
           />
         </div>
         <div>
@@ -64,8 +65,9 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           <input
             type="date"
             value={formatDateForInput(dateRange.end)}
-            onChange={handleEndDateChange}
-            className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm text-gray-200 backdrop-blur-sm"
+            onChange={!loading ? handleEndDateChange : undefined}
+            disabled={loading}
+            className={`w-full px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm text-gray-200 backdrop-blur-sm ${loading ? 'opacity-70 cursor-wait' : ''}`}
           />
         </div>
       </div>

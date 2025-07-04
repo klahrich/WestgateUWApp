@@ -299,7 +299,19 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900 relative">
+      {/* Loading Overlay */}
+      {dataRefreshing && (
+        <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 shadow-xl border border-cyan-500/20 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mb-4"></div>
+            <p className="text-cyan-300 font-medium">Loading data...</p>
+            <p className="text-gray-400 text-sm mt-2">
+              Fetching loans for {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-gray-800/50 backdrop-blur-xl border-b border-gray-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -318,14 +330,9 @@ export const Dashboard: React.FC = () => {
             <div className="flex items-center space-x-6">
               <div className="text-right">
                 <p className="text-sm text-gray-400">Analysis Period</p>
-                <div className="flex items-center space-x-2">
-                  <p className="text-sm font-medium text-gray-200">
-                    {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
-                  </p>
-                  {dataRefreshing && (
-                    <div className="animate-spin h-3 w-3 border-b-2 border-cyan-400 rounded-full"></div>
-                  )}
-                </div>
+                <p className="text-sm font-medium text-gray-200">
+                  {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-400">Total Records</p>
