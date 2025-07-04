@@ -23,6 +23,7 @@ import { DateRangePicker } from './DateRangePicker';
 import { StatsTable } from './StatsTable';
 import { supabase, LoanRecord } from '../lib/supabase';
 import { USE_MOCK_DATA, generateMockData } from '../config/dataSource';
+import { ThresholdMatrix } from './ThresholdMatrix';
 
 interface LoanData {
   id: string;
@@ -40,7 +41,7 @@ interface MonthlyStats {
   acceptanceRate: number;
 }
 
-type ViewMode = 'historical' | 'simulation';
+type ViewMode = 'historical' | 'simulation' | 'threshold-grid';
 
 export const Dashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('historical');
@@ -373,7 +374,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Mode Toggle */}
         <div className="mb-8">
-          <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-2 border border-gray-700/50 inline-flex">
+          <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-2 border border-gray-700/50 inline-flex flex-wrap">
             <button
               onClick={() => setViewMode('historical')}
               className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
@@ -398,6 +399,18 @@ export const Dashboard: React.FC = () => {
               <span className="font-medium">Simulation Mode</span>
               <Sliders className="h-3 w-3 opacity-70" />
             </button>
+            <button
+              onClick={() => setViewMode('threshold-grid')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
+                viewMode === 'threshold-grid'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span className="font-medium">Threshold Grid</span>
+              <PieChart className="h-3 w-3 opacity-70" />
+            </button>
           </div>
           
           {/* Mode Description */}
@@ -419,7 +432,7 @@ export const Dashboard: React.FC = () => {
                   )}
                 </div>
               </div>
-            ) : (
+            ) : viewMode === 'simulation' ? (
               <div className="flex items-start space-x-3">
                 <div className="bg-purple-500/10 p-2 rounded-lg border border-purple-500/20">
                   <Zap className="h-4 w-4 text-purple-400" />
@@ -431,16 +444,29 @@ export const Dashboard: React.FC = () => {
                   </p>
                 </div>
               </div>
+            ) : (
+              <div className="flex items-start space-x-3">
+                <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                  <BarChart3 className="h-4 w-4 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-amber-400 mb-1">Threshold Grid Analysis</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Visualizing how Accept Rate changes across different threshold combinations. The grid shows outcomes for all possible threshold pairs in 0.05 increments.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Left Column - Controls */}
-          <div className="lg:col-span-1 space-y-6">
+        {viewMode === 'threshold-grid' ? (
+          /* Threshold Grid View */
+          <div className="space-y-6">
+            {/* Date Range Control */}
             <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
               <div className="flex items-center space-x-2 mb-4">
-                <Calendar className="h-5 w-5 text-cyan-400" />
+                <Calendar className="h-5 w-5 text-amber-400" />
                 <h2 className="text-lg font-semibold text-gray-100">Date Range</h2>
               </div>
               <DateRangePicker
@@ -449,133 +475,167 @@ export const Dashboard: React.FC = () => {
                 loading={dataRefreshing}
               />
             </div>
-
-            {/* Threshold Controls - Only show in simulation mode */}
-            {viewMode === 'simulation' && (
-              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Settings className="h-5 w-5 text-purple-400" />
-                  <h2 className="text-lg font-semibold text-gray-100">Risk Thresholds</h2>
-                </div>
-                <ThresholdControls
-                  defaultThreshold={defaultThreshold}
-                  refusalThreshold={refusalThreshold}
-                  onDefaultChange={setDefaultThreshold}
-                  onRefusalChange={setRefusalThreshold}
-                />
-              </div>
-            )}
-
-            {/* Historical Info - Only show in historical mode */}
-            {viewMode === 'historical' && (
-              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
-                <div className="flex items-center space-x-2 mb-4">
-                  {usingMockData ? (
-                    <TestTube className="h-5 w-5 text-amber-400" />
-                  ) : (
-                    <Database className="h-5 w-5 text-blue-400" />
-                  )}
-                  <h2 className="text-lg font-semibold text-gray-100">Data Source</h2>
-                </div>
-                <div className="space-y-3">
-                  {usingMockData ? (
-                    <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
-                      <p className="text-xs text-amber-300 font-medium mb-1">Mock Data</p>
-                      <p className="text-xs text-gray-400">
-                        Using generated mock data for development and testing purposes.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
-                      <p className="text-xs text-blue-300 font-medium mb-1">Historical Decisions</p>
-                      <p className="text-xs text-gray-400">
-                        Showing actual loan decisions from your database records.
-                      </p>
-                    </div>
-                  )}
-                  {aggregateStats.unknown > 0 && (
-                    <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
-                      <p className="text-xs text-amber-300 font-medium mb-1">Missing Data</p>
-                      <p className="text-xs text-gray-400">
-                        {aggregateStats.unknown} records have no decision data and are excluded from analysis.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Main Content */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <MetricsCard
-                title="Total Loans"
-                value={(aggregateStats.total - (viewMode === 'historical' ? aggregateStats.unknown : 0)).toLocaleString()}
-                subtitle={viewMode === 'historical' && aggregateStats.unknown > 0 ? `${aggregateStats.unknown} excluded` : undefined}
-                icon={<BarChart3 className="h-5 w-5" />}
-                color="blue"
-              />
-              <MetricsCard
-                title="Accepted"
-                value={aggregateStats.accepted.toLocaleString()}
-                subtitle={`${aggregateStats.acceptanceRate.toFixed(1)}%`}
-                icon={<CheckCircle className="h-5 w-5" />}
-                color="green"
-              />
-              <MetricsCard
-                title="Refused"
-                value={aggregateStats.refused.toLocaleString()}
-                subtitle={`${(100 - aggregateStats.acceptanceRate).toFixed(1)}%`}
-                icon={<XCircle className="h-5 w-5" />}
-                color="red"
-              />
-              <MetricsCard
-                title="Accept Rate"
-                value={`${aggregateStats.acceptanceRate.toFixed(1)}%`}
-                icon={<TrendingUp className="h-5 w-5" />}
-                color="purple"
-              />
-            </div>
-
-            {/* Charts */}
+            
+            {/* Threshold Grid */}
             <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-2">
-                  <PieChart className={`h-5 w-5 ${viewMode === 'historical' ? 'text-blue-400' : 'text-purple-400'}`} />
+                  <BarChart3 className="h-5 w-5 text-amber-400" />
                   <h2 className="text-lg font-semibold text-gray-100">
-                    Monthly Trends {viewMode === 'historical' ? '(Historical)' : '(Simulated)'}
+                    Threshold Grid Analysis
                   </h2>
                 </div>
-                <div className="flex items-center space-x-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full shadow-lg"></div>
-                    <span className="text-gray-300">Accepted</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-gradient-to-r from-red-400 to-pink-500 rounded-full shadow-lg"></div>
-                    <span className="text-gray-300">Refused</span>
-                  </div>
+                <div className="text-sm text-gray-400">
+                  {filteredLoans.length.toLocaleString()} loans analyzed
                 </div>
               </div>
-              <MonthlyChart data={monthlyStats} />
-            </div>
-
-            {/* Detailed Statistics Table */}
-            <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-700/50 overflow-hidden">
-              <div className="p-6 border-b border-gray-700/50">
-                <div className="flex items-center space-x-2">
-                  <BarChart3 className={`h-5 w-5 ${viewMode === 'historical' ? 'text-blue-400' : 'text-purple-400'}`} />
-                  <h2 className="text-lg font-semibold text-gray-100">
-                    Monthly Breakdown {viewMode === 'historical' ? '(Historical)' : '(Simulated)'}
-                  </h2>
-                </div>
-              </div>
-              <StatsTable data={monthlyStats} />
+              <ThresholdMatrix loans={filteredLoans} />
             </div>
           </div>
-        </div>
+        ) : (
+          /* Historical and Simulation Views */
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Left Column - Controls */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Calendar className="h-5 w-5 text-cyan-400" />
+                  <h2 className="text-lg font-semibold text-gray-100">Date Range</h2>
+                </div>
+                <DateRangePicker
+                  dateRange={dateRange}
+                  onChange={setDateRange}
+                  loading={dataRefreshing}
+                />
+              </div>
+
+              {/* Threshold Controls - Only show in simulation mode */}
+              {viewMode === 'simulation' && (
+                <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Settings className="h-5 w-5 text-purple-400" />
+                    <h2 className="text-lg font-semibold text-gray-100">Risk Thresholds</h2>
+                  </div>
+                  <ThresholdControls
+                    defaultThreshold={defaultThreshold}
+                    refusalThreshold={refusalThreshold}
+                    onDefaultChange={setDefaultThreshold}
+                    onRefusalChange={setRefusalThreshold}
+                  />
+                </div>
+              )}
+
+              {/* Historical Info - Only show in historical mode */}
+              {viewMode === 'historical' && (
+                <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
+                  <div className="flex items-center space-x-2 mb-4">
+                    {usingMockData ? (
+                      <TestTube className="h-5 w-5 text-amber-400" />
+                    ) : (
+                      <Database className="h-5 w-5 text-blue-400" />
+                    )}
+                    <h2 className="text-lg font-semibold text-gray-100">Data Source</h2>
+                  </div>
+                  <div className="space-y-3">
+                    {usingMockData ? (
+                      <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                        <p className="text-xs text-amber-300 font-medium mb-1">Mock Data</p>
+                        <p className="text-xs text-gray-400">
+                          Using generated mock data for development and testing purposes.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+                        <p className="text-xs text-blue-300 font-medium mb-1">Historical Decisions</p>
+                        <p className="text-xs text-gray-400">
+                          Showing actual loan decisions from your database records.
+                        </p>
+                      </div>
+                    )}
+                    {aggregateStats.unknown > 0 && (
+                      <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                        <p className="text-xs text-amber-300 font-medium mb-1">Missing Data</p>
+                        <p className="text-xs text-gray-400">
+                          {aggregateStats.unknown} records have no decision data and are excluded from analysis.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Main Content */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Key Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <MetricsCard
+                  title="Total Loans"
+                  value={(aggregateStats.total - (viewMode === 'historical' ? aggregateStats.unknown : 0)).toLocaleString()}
+                  subtitle={viewMode === 'historical' && aggregateStats.unknown > 0 ? `${aggregateStats.unknown} excluded` : undefined}
+                  icon={<BarChart3 className="h-5 w-5" />}
+                  color="blue"
+                />
+                <MetricsCard
+                  title="Accepted"
+                  value={aggregateStats.accepted.toLocaleString()}
+                  subtitle={`${aggregateStats.acceptanceRate.toFixed(1)}%`}
+                  icon={<CheckCircle className="h-5 w-5" />}
+                  color="green"
+                />
+                <MetricsCard
+                  title="Refused"
+                  value={aggregateStats.refused.toLocaleString()}
+                  subtitle={`${(100 - aggregateStats.acceptanceRate).toFixed(1)}%`}
+                  icon={<XCircle className="h-5 w-5" />}
+                  color="red"
+                />
+                <MetricsCard
+                  title="Accept Rate"
+                  value={`${aggregateStats.acceptanceRate.toFixed(1)}%`}
+                  icon={<TrendingUp className="h-5 w-5" />}
+                  color="purple"
+                />
+              </div>
+
+              {/* Charts */}
+              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-2">
+                    <PieChart className={`h-5 w-5 ${viewMode === 'historical' ? 'text-blue-400' : 'text-purple-400'}`} />
+                    <h2 className="text-lg font-semibold text-gray-100">
+                      Monthly Trends {viewMode === 'historical' ? '(Historical)' : '(Simulated)'}
+                    </h2>
+                  </div>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full shadow-lg"></div>
+                      <span className="text-gray-300">Accepted</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-gradient-to-r from-red-400 to-pink-500 rounded-full shadow-lg"></div>
+                      <span className="text-gray-300">Refused</span>
+                    </div>
+                  </div>
+                </div>
+                <MonthlyChart data={monthlyStats} />
+              </div>
+
+              {/* Detailed Statistics Table */}
+              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-700/50 overflow-hidden">
+                <div className="p-6 border-b border-gray-700/50">
+                  <div className="flex items-center space-x-2">
+                    <BarChart3 className={`h-5 w-5 ${viewMode === 'historical' ? 'text-blue-400' : 'text-purple-400'}`} />
+                    <h2 className="text-lg font-semibold text-gray-100">
+                      Monthly Breakdown {viewMode === 'historical' ? '(Historical)' : '(Simulated)'}
+                    </h2>
+                  </div>
+                </div>
+                <StatsTable data={monthlyStats} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
