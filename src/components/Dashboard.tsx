@@ -56,6 +56,7 @@ export const Dashboard: React.FC = () => {
   const [usingMockData, setUsingMockData] = useState(USE_MOCK_DATA);
 
   // Fetch data (either real or mock)
+  // Effect to fetch data when dateRange changes
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -69,9 +70,20 @@ export const Dashboard: React.FC = () => {
           setLoans(mockLoans);
           setUsingMockData(true);
         } else {
-          // Fetch real data from Supabase using pagination to get ALL records
-          console.log('Fetching real data from Supabase with pagination');
+          // Format dates for Supabase query
+          // Set start date to beginning of day in ISO format
+          const startDate = new Date(dateRange.start);
+          startDate.setHours(0, 0, 0, 0);
+          const startDateISO = startDate.toISOString();
           
+          // Set end date to end of day in ISO format
+          const endDate = new Date(dateRange.end);
+          endDate.setHours(23, 59, 59, 999);
+          const endDateISO = endDate.toISOString();
+          
+          console.log(`Fetching data for date range: ${startDateISO} to ${endDateISO}`);
+          
+          // Fetch real data from Supabase with date range filter and pagination
           let allData: any[] = [];
           let page = 0;
           const pageSize = 1000;
@@ -88,6 +100,8 @@ export const Dashboard: React.FC = () => {
               .select('id, created_at, default_score, refusal_score, decision')
               .not('default_score', 'is', null)
               .not('refusal_score', 'is', null)
+              .gte('created_at', startDateISO)  // Greater than or equal to start date
+              .lte('created_at', endDateISO)    // Less than or equal to end date
               .order('created_at', { ascending: true })
               .range(from, to);
               
@@ -109,7 +123,7 @@ export const Dashboard: React.FC = () => {
             }
           }
           
-          console.log('Total records fetched with pagination:', allData.length);
+          console.log('Total records fetched with date range filter:', allData.length);
 
           // Transform the data to match our interface
           const transformedLoans: LoanData[] = allData.map(record => ({
@@ -133,13 +147,15 @@ export const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [dateRange]); // Re-fetch when date range changes
 
   const filteredLoans = useMemo(() => {
+    // Since we're now filtering on the server side with the Supabase query,
+    // we can simplify the client-side filtering logic
+    
     // Helper function to parse Supabase timestamptz correctly
     const parseSupabaseDate = (timestamptz: string): Date => {
       // Ensure the timestamp has a timezone component
-      // If it doesn't have a 'Z' or '+'/'-', assume UTC
       let timestamp = timestamptz;
       if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
         timestamp += 'Z';
@@ -147,115 +163,28 @@ export const Dashboard: React.FC = () => {
       return new Date(timestamp);
     };
     
-    // Set the start date to the beginning of the day (00:00:00.000)
-    const startDateWithTime = new Date(dateRange.start);
-    startDateWithTime.setHours(0, 0, 0, 0);
-    
-    // Set the end date to the end of the day (23:59:59.999)
-    const endDateWithTime = new Date(dateRange.end);
-    endDateWithTime.setHours(23, 59, 59, 999);
-    
-    console.log('Adjusted date range for filtering:', {
-      start: startDateWithTime.toISOString(),
-      end: endDateWithTime.toISOString(),
-      startLocal: startDateWithTime.toLocaleString(),
-      endLocal: endDateWithTime.toLocaleString()
-    });
-    
-    // Log a sample of loan dates before filtering
-    console.log('Sample of loan dates before filtering:');
-    loans.slice(0, 5).forEach((loan, index) => {
-      const parsedDate = parseSupabaseDate(loan.created_at);
-      console.log(`Loan ${index}:`, {
-        created_at: loan.created_at,
-        parsed: parsedDate.toISOString(),
-        parsedLocal: parsedDate.toLocaleString(),
-        year: parsedDate.getFullYear(),
-        month: parsedDate.getMonth() + 1,
-        day: parsedDate.getDate()
-      });
-    });
-    
-    // Count loans that pass each condition separately
-    let afterStartCount = 0;
-    let beforeEndCount = 0;
-    
-    const filtered = loans.filter(loan => {
-      // Parse the Supabase timestamp using our helper function
-      const loanDate = parseSupabaseDate(loan.created_at);
-      
-      // Compare dates by year, month, and day to avoid timezone issues
-      const loanYear = loanDate.getFullYear();
-      const loanMonth = loanDate.getMonth();
-      const loanDay = loanDate.getDate();
-      
-      const startYear = startDateWithTime.getFullYear();
-      const startMonth = startDateWithTime.getMonth();
-      const startDay = startDateWithTime.getDate();
-      
-      const endYear = endDateWithTime.getFullYear();
-      const endMonth = endDateWithTime.getMonth();
-      const endDay = endDateWithTime.getDate();
-      
-      // Check if loan date is on or after start date
-      const isAfterStart = (
-        loanYear > startYear ||
-        (loanYear === startYear && loanMonth > startMonth) ||
-        (loanYear === startYear && loanMonth === startMonth && loanDay >= startDay)
-      );
-      
-      // Check if loan date is on or before end date
-      const isBeforeEnd = (
-        loanYear < endYear ||
-        (loanYear === endYear && loanMonth < endMonth) ||
-        (loanYear === endYear && loanMonth === endMonth && loanDay <= endDay)
-      );
-      
-      // Update counters
-      if (isAfterStart) afterStartCount++;
-      if (isBeforeEnd) beforeEndCount++;
-      
-      // Debug logging for the first few loans to understand the issue
-      // Only log the first 5 loans to avoid excessive logging
-      const loanIndex = loans.indexOf(loan);
-      if (loanIndex < 5) {
-        console.log('Loan date comparison:', {
-          index: loanIndex,
-          loanCreatedAt: loan.created_at,
-          loanDateObj: loanDate.toISOString(),
-          loanDateLocal: loanDate.toLocaleString(),
-          loanYear, loanMonth, loanDay,
-          startDate: startDateWithTime.toISOString(),
-          startDateLocal: startDateWithTime.toLocaleString(),
-          startYear, startMonth, startDay,
-          endDate: endDateWithTime.toISOString(),
-          endDateLocal: endDateWithTime.toLocaleString(),
-          endYear, endMonth, endDay,
-          isAfterStart: isAfterStart,
-          isBeforeEnd: isBeforeEnd,
-          passes: isAfterStart && isBeforeEnd
-        });
-      }
-      
-      // Compare with the adjusted date range
-      return isAfterStart && isBeforeEnd;
-    });
-    
-    // Log summary of filtering results
-    console.log('Date filtering summary:', {
-      totalLoans: loans.length,
-      passedStartCondition: afterStartCount,
-      passedEndCondition: beforeEndCount,
-      passedBothConditions: filtered.length
-    });
-    
-    console.log('Filtered loans for date range:', filtered.length);
-    console.log('Date range:', {
+    // Log the date range we're using
+    console.log('Client-side date range:', {
       start: dateRange.start.toLocaleDateString(),
       end: dateRange.end.toLocaleDateString()
     });
     
-    return filtered;
+    // Log a sample of the fetched loans
+    if (loans.length > 0) {
+      console.log('Sample of fetched loans:');
+      loans.slice(0, 3).forEach((loan, index) => {
+        console.log(`Loan ${index}:`, {
+          created_at: loan.created_at,
+          date: parseSupabaseDate(loan.created_at).toLocaleDateString()
+        });
+      });
+    }
+    
+    console.log('Filtered loans count:', loans.length);
+    
+    // We're already filtering on the server, so we can just return the loans
+    // without additional filtering
+    return loans;
   }, [loans, dateRange]);
 
   // Historical decisions (actual decisions from database)
