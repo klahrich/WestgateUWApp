@@ -9,19 +9,25 @@ import {
   Shield,
   AlertTriangle,
   CheckCircle,
-  XCircle
+  XCircle,
+  History,
+  Zap,
+  Database,
+  Sliders
 } from 'lucide-react';
 import { ThresholdControls } from './ThresholdControls';
 import { MetricsCard } from './MetricsCard';
 import { MonthlyChart } from './MonthlyChart';
 import { DateRangePicker } from './DateRangePicker';
 import { StatsTable } from './StatsTable';
+import { supabase, LoanRecord } from '../lib/supabase';
 
 interface LoanData {
   id: string;
   created_at: string;
   default_score: number;
   refusal_score: number;
+  historical_decision?: string; // For actual historical decisions
 }
 
 interface MonthlyStats {
@@ -32,7 +38,10 @@ interface MonthlyStats {
   acceptanceRate: number;
 }
 
+type ViewMode = 'historical' | 'simulation';
+
 export const Dashboard: React.FC = () => {
+  const [viewMode, setViewMode] = useState<ViewMode>('historical');
   const [defaultThreshold, setDefaultThreshold] = useState(0.7);
   const [refusalThreshold, setRefusalThreshold] = useState(0.6);
   const [dateRange, setDateRange] = useState({
@@ -41,29 +50,45 @@ export const Dashboard: React.FC = () => {
   });
   const [loans, setLoans] = useState<LoanData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data for demonstration - replace with actual Supabase data
+  // Fetch real data from Supabase
   useEffect(() => {
-    const generateMockData = () => {
-      const mockLoans: LoanData[] = [];
-      const startDate = new Date(2023, 0, 1);
-      const endDate = new Date();
-      
-      for (let i = 0; i < 500; i++) {
-        const randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
-        mockLoans.push({
-          id: `loan-${i}`,
-          created_at: randomDate.toISOString(),
-          default_score: Math.random(),
-          refusal_score: Math.random()
-        });
+    const fetchLoans = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { data, error } = await supabase
+          .from('logs')
+          .select('id, created_at, default_score, refusal_score, decision')
+          .not('default_score', 'is', null)
+          .not('refusal_score', 'is', null)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        // Transform the data to match our interface
+        const transformedLoans: LoanData[] = (data || []).map((record: LoanRecord) => ({
+          id: record.id.toString(),
+          created_at: record.created_at,
+          default_score: record.default_score || 0,
+          refusal_score: record.refusal_score || 0,
+          historical_decision: record.decision || undefined
+        }));
+
+        setLoans(transformedLoans);
+      } catch (err) {
+        console.error('Error fetching loans:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch loan data');
+      } finally {
+        setLoading(false);
       }
-      
-      setLoans(mockLoans);
-      setLoading(false);
     };
 
-    generateMockData();
+    fetchLoans();
   }, []);
 
   const filteredLoans = useMemo(() => {
@@ -73,26 +98,40 @@ export const Dashboard: React.FC = () => {
     });
   }, [loans, dateRange]);
 
-  const loanDecisions = useMemo(() => {
+  // Historical decisions (actual decisions from database)
+  const historicalDecisions = useMemo(() => {
+    return filteredLoans.map(loan => ({
+      ...loan,
+      decision: loan.historical_decision || 'unknown'
+    }));
+  }, [filteredLoans]);
+
+  // Simulated decisions (based on current thresholds)
+  const simulatedDecisions = useMemo(() => {
     return filteredLoans.map(loan => ({
       ...loan,
       decision: (loan.default_score > defaultThreshold || loan.refusal_score > refusalThreshold) ? 'refuse' : 'accept'
     }));
   }, [filteredLoans, defaultThreshold, refusalThreshold]);
 
+  const currentDecisions = viewMode === 'historical' ? historicalDecisions : simulatedDecisions;
+
   const aggregateStats = useMemo(() => {
-    const total = loanDecisions.length;
-    const accepted = loanDecisions.filter(loan => loan.decision === 'accept').length;
-    const refused = total - accepted;
-    const acceptanceRate = total > 0 ? (accepted / total) * 100 : 0;
+    const total = currentDecisions.length;
+    const accepted = currentDecisions.filter(loan => loan.decision === 'accept').length;
+    const refused = currentDecisions.filter(loan => loan.decision === 'refuse').length;
+    const unknown = currentDecisions.filter(loan => loan.decision === 'unknown').length;
+    const acceptanceRate = (total - unknown) > 0 ? (accepted / (total - unknown)) * 100 : 0;
     
-    return { total, accepted, refused, acceptanceRate };
-  }, [loanDecisions]);
+    return { total, accepted, refused, unknown, acceptanceRate };
+  }, [currentDecisions]);
 
   const monthlyStats = useMemo(() => {
     const monthlyData: { [key: string]: MonthlyStats } = {};
     
-    loanDecisions.forEach(loan => {
+    currentDecisions.forEach(loan => {
+      if (loan.decision === 'unknown') return; // Skip unknown decisions for monthly stats
+      
       const date = new Date(loan.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       
@@ -119,14 +158,37 @@ export const Dashboard: React.FC = () => {
     });
     
     return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
-  }, [loanDecisions]);
+  }, [currentDecisions]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading dashboard...</p>
+          <p className="text-gray-300">Loading loan data from Supabase...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 mb-4">
+            <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-red-400 mb-2">Connection Error</h2>
+            <p className="text-gray-300 text-sm mb-4">{error}</p>
+            <p className="text-gray-400 text-xs">
+              Make sure you've connected to Supabase using the "Connect to Supabase" button in the top right.
+            </p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors duration-200"
+          >
+            Retry Connection
+          </button>
         </div>
       </div>
     );
@@ -149,11 +211,17 @@ export const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-400">Lending Analytics Dashboard</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-6">
               <div className="text-right">
                 <p className="text-sm text-gray-400">Analysis Period</p>
                 <p className="text-sm font-medium text-gray-200">
                   {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-400">Total Records</p>
+                <p className="text-sm font-medium text-cyan-400">
+                  {loans.length.toLocaleString()} loans
                 </p>
               </div>
               <Calendar className="h-5 w-5 text-gray-400" />
@@ -163,25 +231,71 @@ export const Dashboard: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Mode Toggle */}
+        <div className="mb-8">
+          <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-2 border border-gray-700/50 inline-flex">
+            <button
+              onClick={() => setViewMode('historical')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
+                viewMode === 'historical'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              }`}
+            >
+              <History className="h-4 w-4" />
+              <span className="font-medium">Historical Analysis</span>
+              <Database className="h-3 w-3 opacity-70" />
+            </button>
+            <button
+              onClick={() => setViewMode('simulation')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
+                viewMode === 'simulation'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              }`}
+            >
+              <Zap className="h-4 w-4" />
+              <span className="font-medium">Simulation Mode</span>
+              <Sliders className="h-3 w-3 opacity-70" />
+            </button>
+          </div>
+          
+          {/* Mode Description */}
+          <div className="mt-4 p-4 bg-gray-800/30 rounded-xl border border-gray-700/30">
+            {viewMode === 'historical' ? (
+              <div className="flex items-start space-x-3">
+                <div className="bg-blue-500/10 p-2 rounded-lg border border-blue-500/20">
+                  <History className="h-4 w-4 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-blue-400 mb-1">Historical Analysis</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Viewing actual historical loan decisions from your database. This shows real outcomes and cannot be modified.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start space-x-3">
+                <div className="bg-purple-500/10 p-2 rounded-lg border border-purple-500/20">
+                  <Zap className="h-4 w-4 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-purple-400 mb-1">Simulation Mode</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Simulating loan decisions using adjustable risk thresholds. Change the thresholds to see how different criteria would affect outcomes.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Left Column - Controls */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
               <div className="flex items-center space-x-2 mb-4">
-                <Settings className="h-5 w-5 text-cyan-400" />
-                <h2 className="text-lg font-semibold text-gray-100">Risk Thresholds</h2>
-              </div>
-              <ThresholdControls
-                defaultThreshold={defaultThreshold}
-                refusalThreshold={refusalThreshold}
-                onDefaultChange={setDefaultThreshold}
-                onRefusalChange={setRefusalThreshold}
-              />
-            </div>
-
-            <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
-              <div className="flex items-center space-x-2 mb-4">
-                <Calendar className="h-5 w-5 text-purple-400" />
+                <Calendar className="h-5 w-5 text-cyan-400" />
                 <h2 className="text-lg font-semibold text-gray-100">Date Range</h2>
               </div>
               <DateRangePicker
@@ -189,6 +303,48 @@ export const Dashboard: React.FC = () => {
                 onChange={setDateRange}
               />
             </div>
+
+            {/* Threshold Controls - Only show in simulation mode */}
+            {viewMode === 'simulation' && (
+              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Settings className="h-5 w-5 text-purple-400" />
+                  <h2 className="text-lg font-semibold text-gray-100">Risk Thresholds</h2>
+                </div>
+                <ThresholdControls
+                  defaultThreshold={defaultThreshold}
+                  refusalThreshold={refusalThreshold}
+                  onDefaultChange={setDefaultThreshold}
+                  onRefusalChange={setRefusalThreshold}
+                />
+              </div>
+            )}
+
+            {/* Historical Info - Only show in historical mode */}
+            {viewMode === 'historical' && (
+              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Database className="h-5 w-5 text-blue-400" />
+                  <h2 className="text-lg font-semibold text-gray-100">Data Source</h2>
+                </div>
+                <div className="space-y-3">
+                  <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+                    <p className="text-xs text-blue-300 font-medium mb-1">Historical Decisions</p>
+                    <p className="text-xs text-gray-400">
+                      Showing actual loan decisions from your database records.
+                    </p>
+                  </div>
+                  {aggregateStats.unknown > 0 && (
+                    <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                      <p className="text-xs text-amber-300 font-medium mb-1">Missing Data</p>
+                      <p className="text-xs text-gray-400">
+                        {aggregateStats.unknown} records have no decision data and are excluded from analysis.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Main Content */}
@@ -197,7 +353,8 @@ export const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <MetricsCard
                 title="Total Loans"
-                value={aggregateStats.total.toLocaleString()}
+                value={(aggregateStats.total - (viewMode === 'historical' ? aggregateStats.unknown : 0)).toLocaleString()}
+                subtitle={viewMode === 'historical' && aggregateStats.unknown > 0 ? `${aggregateStats.unknown} excluded` : undefined}
                 icon={<BarChart3 className="h-5 w-5" />}
                 color="blue"
               />
@@ -227,8 +384,10 @@ export const Dashboard: React.FC = () => {
             <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-2">
-                  <PieChart className="h-5 w-5 text-cyan-400" />
-                  <h2 className="text-lg font-semibold text-gray-100">Monthly Trends</h2>
+                  <PieChart className={`h-5 w-5 ${viewMode === 'historical' ? 'text-blue-400' : 'text-purple-400'}`} />
+                  <h2 className="text-lg font-semibold text-gray-100">
+                    Monthly Trends {viewMode === 'historical' ? '(Historical)' : '(Simulated)'}
+                  </h2>
                 </div>
                 <div className="flex items-center space-x-4 text-sm">
                   <div className="flex items-center space-x-2">
@@ -248,8 +407,10 @@ export const Dashboard: React.FC = () => {
             <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-700/50 overflow-hidden">
               <div className="p-6 border-b border-gray-700/50">
                 <div className="flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-purple-400" />
-                  <h2 className="text-lg font-semibold text-gray-100">Monthly Breakdown</h2>
+                  <BarChart3 className={`h-5 w-5 ${viewMode === 'historical' ? 'text-blue-400' : 'text-purple-400'}`} />
+                  <h2 className="text-lg font-semibold text-gray-100">
+                    Monthly Breakdown {viewMode === 'historical' ? '(Historical)' : '(Simulated)'}
+                  </h2>
                 </div>
               </div>
               <StatsTable data={monthlyStats} />
