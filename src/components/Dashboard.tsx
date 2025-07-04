@@ -13,7 +13,8 @@ import {
   History,
   Zap,
   Database,
-  Sliders
+  Sliders,
+  TestTube
 } from 'lucide-react';
 import { ThresholdControls } from './ThresholdControls';
 import { MetricsCard } from './MetricsCard';
@@ -21,6 +22,7 @@ import { MonthlyChart } from './MonthlyChart';
 import { DateRangePicker } from './DateRangePicker';
 import { StatsTable } from './StatsTable';
 import { supabase, LoanRecord } from '../lib/supabase';
+import { USE_MOCK_DATA, generateMockData } from '../config/dataSource';
 
 interface LoanData {
   id: string;
@@ -51,59 +53,220 @@ export const Dashboard: React.FC = () => {
   const [loans, setLoans] = useState<LoanData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(USE_MOCK_DATA);
 
-  // Fetch real data from Supabase
+  // Fetch data (either real or mock)
   useEffect(() => {
-    const fetchLoans = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        const { data, error } = await supabase
-          .from('logs')
-          .select('id, created_at, default_score, refusal_score, decision')
-          .not('default_score', 'is', null)
-          .not('refusal_score', 'is', null)
-          .order('created_at', { ascending: true });
+        if (USE_MOCK_DATA) {
+          // Use mock data
+          console.log('Using mock data for development');
+          const mockLoans = generateMockData();
+          setLoans(mockLoans);
+          setUsingMockData(true);
+        } else {
+          // Fetch real data from Supabase using pagination to get ALL records
+          console.log('Fetching real data from Supabase with pagination');
+          
+          let allData: any[] = [];
+          let page = 0;
+          const pageSize = 1000;
+          let hasMore = true;
+          
+          while (hasMore) {
+            const from = page * pageSize;
+            const to = from + pageSize - 1;
+            
+            console.log(`Fetching page ${page + 1} (records ${from}-${to})...`);
+            
+            const { data, error } = await supabase
+              .from('logs')
+              .select('id, created_at, default_score, refusal_score, decision')
+              .not('default_score', 'is', null)
+              .not('refusal_score', 'is', null)
+              .order('created_at', { ascending: true })
+              .range(from, to);
+              
+            if (error) {
+              console.error('Supabase query error:', error);
+              throw error;
+            }
+            
+            if (data && data.length > 0) {
+              allData = [...allData, ...data];
+              page++;
+              
+              // If we got fewer records than the page size, we've reached the end
+              if (data.length < pageSize) {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+          
+          console.log('Total records fetched with pagination:', allData.length);
 
-        if (error) {
-          throw error;
+          // Transform the data to match our interface
+          const transformedLoans: LoanData[] = allData.map(record => ({
+            id: record.id.toString(),
+            created_at: record.created_at,
+            default_score: record.default_score || 0,
+            refusal_score: record.refusal_score || 0,
+            historical_decision: record.decision || undefined
+          }));
+
+          console.log('Transformed loans:', transformedLoans.length);
+          setLoans(transformedLoans);
+          setUsingMockData(false);
         }
-
-        // Transform the data to match our interface
-        const transformedLoans: LoanData[] = (data || []).map((record: LoanRecord) => ({
-          id: record.id.toString(),
-          created_at: record.created_at,
-          default_score: record.default_score || 0,
-          refusal_score: record.refusal_score || 0,
-          historical_decision: record.decision || undefined
-        }));
-
-        setLoans(transformedLoans);
       } catch (err) {
-        console.error('Error fetching loans:', err);
+        console.error('Error fetching data:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch loan data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLoans();
+    fetchData();
   }, []);
 
   const filteredLoans = useMemo(() => {
-    return loans.filter(loan => {
-      const loanDate = new Date(loan.created_at);
-      return loanDate >= dateRange.start && loanDate <= dateRange.end;
+    // Helper function to parse Supabase timestamptz correctly
+    const parseSupabaseDate = (timestamptz: string): Date => {
+      // Ensure the timestamp has a timezone component
+      // If it doesn't have a 'Z' or '+'/'-', assume UTC
+      let timestamp = timestamptz;
+      if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+        timestamp += 'Z';
+      }
+      return new Date(timestamp);
+    };
+    
+    // Set the start date to the beginning of the day (00:00:00.000)
+    const startDateWithTime = new Date(dateRange.start);
+    startDateWithTime.setHours(0, 0, 0, 0);
+    
+    // Set the end date to the end of the day (23:59:59.999)
+    const endDateWithTime = new Date(dateRange.end);
+    endDateWithTime.setHours(23, 59, 59, 999);
+    
+    console.log('Adjusted date range for filtering:', {
+      start: startDateWithTime.toISOString(),
+      end: endDateWithTime.toISOString(),
+      startLocal: startDateWithTime.toLocaleString(),
+      endLocal: endDateWithTime.toLocaleString()
     });
+    
+    // Log a sample of loan dates before filtering
+    console.log('Sample of loan dates before filtering:');
+    loans.slice(0, 5).forEach((loan, index) => {
+      const parsedDate = parseSupabaseDate(loan.created_at);
+      console.log(`Loan ${index}:`, {
+        created_at: loan.created_at,
+        parsed: parsedDate.toISOString(),
+        parsedLocal: parsedDate.toLocaleString(),
+        year: parsedDate.getFullYear(),
+        month: parsedDate.getMonth() + 1,
+        day: parsedDate.getDate()
+      });
+    });
+    
+    // Count loans that pass each condition separately
+    let afterStartCount = 0;
+    let beforeEndCount = 0;
+    
+    const filtered = loans.filter(loan => {
+      // Parse the Supabase timestamp using our helper function
+      const loanDate = parseSupabaseDate(loan.created_at);
+      
+      // Compare dates by year, month, and day to avoid timezone issues
+      const loanYear = loanDate.getFullYear();
+      const loanMonth = loanDate.getMonth();
+      const loanDay = loanDate.getDate();
+      
+      const startYear = startDateWithTime.getFullYear();
+      const startMonth = startDateWithTime.getMonth();
+      const startDay = startDateWithTime.getDate();
+      
+      const endYear = endDateWithTime.getFullYear();
+      const endMonth = endDateWithTime.getMonth();
+      const endDay = endDateWithTime.getDate();
+      
+      // Check if loan date is on or after start date
+      const isAfterStart = (
+        loanYear > startYear ||
+        (loanYear === startYear && loanMonth > startMonth) ||
+        (loanYear === startYear && loanMonth === startMonth && loanDay >= startDay)
+      );
+      
+      // Check if loan date is on or before end date
+      const isBeforeEnd = (
+        loanYear < endYear ||
+        (loanYear === endYear && loanMonth < endMonth) ||
+        (loanYear === endYear && loanMonth === endMonth && loanDay <= endDay)
+      );
+      
+      // Update counters
+      if (isAfterStart) afterStartCount++;
+      if (isBeforeEnd) beforeEndCount++;
+      
+      // Debug logging for the first few loans to understand the issue
+      // Only log the first 5 loans to avoid excessive logging
+      const loanIndex = loans.indexOf(loan);
+      if (loanIndex < 5) {
+        console.log('Loan date comparison:', {
+          index: loanIndex,
+          loanCreatedAt: loan.created_at,
+          loanDateObj: loanDate.toISOString(),
+          loanDateLocal: loanDate.toLocaleString(),
+          loanYear, loanMonth, loanDay,
+          startDate: startDateWithTime.toISOString(),
+          startDateLocal: startDateWithTime.toLocaleString(),
+          startYear, startMonth, startDay,
+          endDate: endDateWithTime.toISOString(),
+          endDateLocal: endDateWithTime.toLocaleString(),
+          endYear, endMonth, endDay,
+          isAfterStart: isAfterStart,
+          isBeforeEnd: isBeforeEnd,
+          passes: isAfterStart && isBeforeEnd
+        });
+      }
+      
+      // Compare with the adjusted date range
+      return isAfterStart && isBeforeEnd;
+    });
+    
+    // Log summary of filtering results
+    console.log('Date filtering summary:', {
+      totalLoans: loans.length,
+      passedStartCondition: afterStartCount,
+      passedEndCondition: beforeEndCount,
+      passedBothConditions: filtered.length
+    });
+    
+    console.log('Filtered loans for date range:', filtered.length);
+    console.log('Date range:', {
+      start: dateRange.start.toLocaleDateString(),
+      end: dateRange.end.toLocaleDateString()
+    });
+    
+    return filtered;
   }, [loans, dateRange]);
 
   // Historical decisions (actual decisions from database)
   const historicalDecisions = useMemo(() => {
-    return filteredLoans.map(loan => ({
+    const decisions = filteredLoans.map(loan => ({
       ...loan,
       decision: loan.historical_decision || 'unknown'
     }));
+    console.log('Historical decisions:', decisions);
+    console.log('Historical decisions with known status:', decisions.filter(d => d.decision !== 'unknown').length);
+    return decisions;
   }, [filteredLoans]);
 
   // Simulated decisions (based on current thresholds)
@@ -123,6 +286,7 @@ export const Dashboard: React.FC = () => {
     const unknown = currentDecisions.filter(loan => loan.decision === 'unknown').length;
     const acceptanceRate = (total - unknown) > 0 ? (accepted / (total - unknown)) * 100 : 0;
     
+    console.log('Aggregate stats:', { total, accepted, refused, unknown, acceptanceRate });
     return { total, accepted, refused, unknown, acceptanceRate };
   }, [currentDecisions]);
 
@@ -157,7 +321,9 @@ export const Dashboard: React.FC = () => {
       month.acceptanceRate = month.total > 0 ? (month.accepted / month.total) * 100 : 0;
     });
     
-    return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+    const monthlyStatsArray = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+    console.log('Monthly stats:', monthlyStatsArray);
+    return monthlyStatsArray;
   }, [currentDecisions]);
 
   if (loading) {
@@ -165,13 +331,15 @@ export const Dashboard: React.FC = () => {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading loan data from Supabase...</p>
+          <p className="text-gray-300">
+            {USE_MOCK_DATA ? 'Generating mock data...' : 'Loading loan data from Supabase...'}
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !USE_MOCK_DATA) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
@@ -220,9 +388,19 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-400">Total Records</p>
-                <p className="text-sm font-medium text-cyan-400">
-                  {loans.length.toLocaleString()} loans
-                </p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium text-cyan-400">
+                    {loans.length.toLocaleString()} loans
+                  </p>
+                  {usingMockData && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1">
+                      <div className="flex items-center space-x-1">
+                        <TestTube className="h-3 w-3 text-amber-400" />
+                        <span className="text-xs text-amber-400 font-medium">Mock</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <Calendar className="h-5 w-5 text-gray-400" />
             </div>
@@ -231,6 +409,20 @@ export const Dashboard: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Debug Information - Only show in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4 p-4 bg-gray-800/30 rounded-xl border border-gray-700/30 text-xs text-gray-400">
+            <p><strong>Debug Info:</strong></p>
+            <p>Total loans loaded: {loans.length}</p>
+            <p>Filtered loans (date range): {filteredLoans.length}</p>
+            <p>Current view mode: {viewMode}</p>
+            <p>Using mock data: {usingMockData ? 'Yes' : 'No'}</p>
+            {viewMode === 'historical' && (
+              <p>Historical decisions with data: {historicalDecisions.filter(d => d.decision !== 'unknown').length}</p>
+            )}
+          </div>
+        )}
+
         {/* Mode Toggle */}
         <div className="mb-8">
           <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-2 border border-gray-700/50 inline-flex">
@@ -270,8 +462,13 @@ export const Dashboard: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-medium text-blue-400 mb-1">Historical Analysis</h3>
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    Viewing actual historical loan decisions from your database. This shows real outcomes and cannot be modified.
+                    Viewing actual historical loan decisions {usingMockData ? 'from mock data' : 'from your database'}. This shows real outcomes and cannot be modified.
                   </p>
+                  {!usingMockData && aggregateStats.unknown > 0 && (
+                    <p className="text-xs text-amber-400 mt-2">
+                      Note: {aggregateStats.unknown} records have no decision data and are excluded from analysis.
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -324,16 +521,29 @@ export const Dashboard: React.FC = () => {
             {viewMode === 'historical' && (
               <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-gray-700/50">
                 <div className="flex items-center space-x-2 mb-4">
-                  <Database className="h-5 w-5 text-blue-400" />
+                  {usingMockData ? (
+                    <TestTube className="h-5 w-5 text-amber-400" />
+                  ) : (
+                    <Database className="h-5 w-5 text-blue-400" />
+                  )}
                   <h2 className="text-lg font-semibold text-gray-100">Data Source</h2>
                 </div>
                 <div className="space-y-3">
-                  <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
-                    <p className="text-xs text-blue-300 font-medium mb-1">Historical Decisions</p>
-                    <p className="text-xs text-gray-400">
-                      Showing actual loan decisions from your database records.
-                    </p>
-                  </div>
+                  {usingMockData ? (
+                    <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                      <p className="text-xs text-amber-300 font-medium mb-1">Mock Data</p>
+                      <p className="text-xs text-gray-400">
+                        Using generated mock data for development and testing purposes.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+                      <p className="text-xs text-blue-300 font-medium mb-1">Historical Decisions</p>
+                      <p className="text-xs text-gray-400">
+                        Showing actual loan decisions from your database records.
+                      </p>
+                    </div>
+                  )}
                   {aggregateStats.unknown > 0 && (
                     <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
                       <p className="text-xs text-amber-300 font-medium mb-1">Missing Data</p>
