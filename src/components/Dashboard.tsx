@@ -58,6 +58,16 @@ export const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(USE_MOCK_DATA);
 
+  // State to store the last saved thresholds
+  const [savedThresholds, setSavedThresholds] = useState<{ default: number; refusal: number } | null>(null);
+
+  // Handler for saving thresholds
+  const handleSaveThresholds = (defaultValue: number, refusalValue: number) => {
+    setSavedThresholds({ default: defaultValue, refusal: refusalValue });
+    // Placeholder: Add persistence logic here in the future
+    // e.g., call API or update backend
+  };
+
   // Fetch data (either real or mock)
   // Effect to fetch data when dateRange changes
   useEffect(() => {
@@ -553,8 +563,22 @@ export const Dashboard: React.FC = () => {
                           setSelectedGridThresholds(null);
                         }
                       }}
+                      onSave={handleSaveThresholds}
                     />
-                    
+
+                    {/* Show the currently saved thresholds if available */}
+                    {savedThresholds && (
+                      <div className="mt-3 flex items-center space-x-2 text-xs text-cyan-300">
+                        <span className="font-medium">Current saved thresholds:</span>
+                        <span className="bg-cyan-700/40 px-2 py-1 rounded text-cyan-200">
+                          Default: {savedThresholds.default.toFixed(2)}
+                        </span>
+                        <span className="bg-cyan-700/40 px-2 py-1 rounded text-cyan-200">
+                          Refusal: {savedThresholds.refusal.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
                     {selectedGridThresholds && (
                       <div className="mt-4 p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
                         <p className="text-xs text-cyan-300 font-medium">
