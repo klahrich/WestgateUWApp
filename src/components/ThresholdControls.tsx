@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, Shield } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface ThresholdControlsProps {
   defaultThreshold: number;
@@ -27,10 +28,39 @@ export const ThresholdControls: React.FC<ThresholdControlsProps> = ({
   const [secretInput, setSecretInput] = React.useState("");
   const [attempted, setAttempted] = React.useState(false);
 
+  // Supabase save state
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+
   const handleSave = () => {
     setShowDialog(true);
     setSecretInput("");
     setAttempted(false);
+    setSaveError(null);
+  };
+
+  // Save to Supabase
+  const saveThresholdsToSupabase = async (defaultValue: number, refusalValue: number) => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const { error } = await supabase
+        .from('thresholds')
+        .insert([{ default_threshold: defaultValue, refusal_threshold: refusalValue }]);
+      if (error) {
+        setSaveError("Failed to save to Supabase: " + error.message);
+        setSaving(false);
+        return false;
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+      setSaving(false);
+      return true;
+    } catch (err: any) {
+      setSaveError("Unexpected error: " + (err?.message || String(err)));
+      setSaving(false);
+      return false;
+    }
   };
 
   return (
@@ -74,23 +104,29 @@ export const ThresholdControls: React.FC<ThresholdControlsProps> = ({
                 Cancel
               </button>
               <button
-                className={`px-4 py-2 bg-amber-500 text-white rounded-lg font-semibold transition ${secretInput === SECRET_KEY ? "hover:bg-amber-600" : "opacity-60 cursor-not-allowed"}`}
-                disabled={secretInput !== SECRET_KEY}
-                onClick={() => {
+                className={`px-4 py-2 bg-amber-500 text-white rounded-lg font-semibold transition ${secretInput === SECRET_KEY && !saving ? "hover:bg-amber-600" : "opacity-60 cursor-not-allowed"}`}
+                disabled={secretInput !== SECRET_KEY || saving}
+                onClick={async () => {
                   setAttempted(true);
                   if (secretInput === SECRET_KEY) {
-                    setShowDialog(false);
-                    if (onSave) {
-                      onSave(defaultThreshold, refusalThreshold);
-                      setSaved(true);
-                      setTimeout(() => setSaved(false), 1500);
+                    setSaving(true);
+                    const success = await saveThresholdsToSupabase(defaultThreshold, refusalThreshold);
+                    setSaving(false);
+                    if (success) {
+                      setShowDialog(false);
+                      if (onSave) {
+                        onSave(defaultThreshold, refusalThreshold);
+                      }
                     }
                   }
                 }}
               >
-                Confirm
+                {saving ? "Saving..." : "Confirm"}
               </button>
             </div>
+            {saveError && (
+              <div className="text-xs text-red-400 mt-2">{saveError}</div>
+            )}
           </div>
         </div>
       )}
