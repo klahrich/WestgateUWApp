@@ -22,8 +22,15 @@ export const ThresholdControls: React.FC<ThresholdControlsProps> = ({
   // Dialog state for confirmation
   const [showDialog, setShowDialog] = React.useState(false);
 
+  // Secret key logic
+  const SECRET_KEY = "westgate2025";
+  const [secretInput, setSecretInput] = React.useState("");
+  const [attempted, setAttempted] = React.useState(false);
+
   const handleSave = () => {
     setShowDialog(true);
+    setSecretInput("");
+    setAttempted(false);
   };
 
   return (
@@ -38,6 +45,27 @@ export const ThresholdControls: React.FC<ThresholdControlsProps> = ({
             <p className="text-sm text-gray-200 mb-4">
               Are you sure you want to save these thresholds and use them in the underwriting model? This action will affect future loan decisions.
             </p>
+            <div className="mb-4">
+              <label className="block text-xs text-gray-300 mb-1" htmlFor="secret-key-input">
+                Enter secret key to confirm:
+              </label>
+              <input
+                id="secret-key-input"
+                type="password"
+                className="w-full px-3 py-2 rounded bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={secretInput}
+                onChange={e => {
+                  setSecretInput(e.target.value);
+                  setAttempted(false);
+                }}
+                autoFocus
+                autoComplete="off"
+                placeholder="Secret key"
+              />
+              {attempted && secretInput !== SECRET_KEY && (
+                <div className="text-xs text-red-400 mt-1">Incorrect secret key.</div>
+              )}
+            </div>
             <div className="flex justify-end space-x-3">
               <button
                 className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition"
@@ -46,13 +74,17 @@ export const ThresholdControls: React.FC<ThresholdControlsProps> = ({
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition"
+                className={`px-4 py-2 bg-amber-500 text-white rounded-lg font-semibold transition ${secretInput === SECRET_KEY ? "hover:bg-amber-600" : "opacity-60 cursor-not-allowed"}`}
+                disabled={secretInput !== SECRET_KEY}
                 onClick={() => {
-                  setShowDialog(false);
-                  if (onSave) {
-                    onSave(defaultThreshold, refusalThreshold);
-                    setSaved(true);
-                    setTimeout(() => setSaved(false), 1500);
+                  setAttempted(true);
+                  if (secretInput === SECRET_KEY) {
+                    setShowDialog(false);
+                    if (onSave) {
+                      onSave(defaultThreshold, refusalThreshold);
+                      setSaved(true);
+                      setTimeout(() => setSaved(false), 1500);
+                    }
                   }
                 }}
               >
