@@ -3,6 +3,9 @@ import React from 'react';
 interface DateRange {
   start: Date;
   end: Date;
+  // Add string representations to preserve exact input values
+  startString?: string;
+  endString?: string;
 }
 
 interface DateRangePickerProps {
@@ -21,18 +24,24 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   };
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newStart = new Date(e.target.value);
+    const dateString = e.target.value; // Preserve the exact string from input
+    const newStart = new Date(dateString);
     onChange({
       start: newStart,
-      end: dateRange.end
+      end: dateRange.end,
+      startString: dateString,
+      endString: dateRange.endString
     });
   };
 
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newEnd = new Date(e.target.value);
+    const dateString = e.target.value; // Preserve the exact string from input
+    const newEnd = new Date(dateString);
     onChange({
       start: dateRange.start,
-      end: newEnd
+      end: newEnd,
+      startString: dateRange.startString,
+      endString: dateString
     });
   };
 
@@ -40,7 +49,17 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     const end = new Date();
     const start = new Date();
     start.setMonth(start.getMonth() - months);
-    onChange({ start, end });
+    
+    // Format the date strings
+    const endString = formatDateForInput(end);
+    const startString = formatDateForInput(start);
+    
+    onChange({
+      start,
+      end,
+      startString,
+      endString
+    });
   };
 
   return (
@@ -97,10 +116,22 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             Last Year
           </button>
           <button
-            onClick={() => !loading && onChange({
-              start: new Date(new Date().getFullYear(), 0, 1),
-              end: new Date()
-            })}
+            onClick={() => {
+              if (loading) return;
+              const end = new Date();
+              const start = new Date(new Date().getFullYear(), 0, 1);
+              
+              // Format the date strings
+              const endString = formatDateForInput(end);
+              const startString = formatDateForInput(start);
+              
+              onChange({
+                start,
+                end,
+                startString,
+                endString
+              });
+            }}
             disabled={loading}
             className={`px-3 py-2 text-xs bg-gray-700/50 hover:bg-gray-600/50 text-gray-200 rounded-lg transition-all duration-200 border border-gray-600/30 hover:border-gray-500/50 backdrop-blur-sm ${loading ? 'opacity-70 cursor-wait' : ''}`}
           >

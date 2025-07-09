@@ -38,6 +38,7 @@ interface MonthlyStats {
   total: number;
   accepted: number;
   refused: number;
+  unknown: number;
   acceptanceRate: number;
 }
 
@@ -48,9 +49,16 @@ export const Dashboard: React.FC = () => {
   const [defaultThreshold, setDefaultThreshold] = useState(0.7);
   const [refusalThreshold, setRefusalThreshold] = useState(0.6);
   const [selectedGridThresholds, setSelectedGridThresholds] = useState<{default: number, refusal: number} | null>(null);
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<{
+    start: Date;
+    end: Date;
+    startString?: string;
+    endString?: string;
+  }>({
     start: new Date(new Date().getFullYear(), 0, 1),
-    end: new Date()
+    end: new Date(),
+    startString: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+    endString: new Date().toISOString().split('T')[0]
   });
   const [loans, setLoans] = useState<LoanData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,18 +96,14 @@ export const Dashboard: React.FC = () => {
           setLoans(mockLoans);
           setUsingMockData(true);
         } else {
-          // Format dates for Supabase query
-          // Set start date to beginning of day in ISO format
-          const startDate = new Date(dateRange.start);
-          startDate.setHours(0, 0, 0, 0);
-          const startDateISO = startDate.toISOString();
+          // Use the exact string values from the date picker inputs
+          // This completely bypasses any Date object timezone issues
           
-          // Set end date to end of day in ISO format
-          const endDate = new Date(dateRange.end);
-          endDate.setHours(23, 59, 59, 999);
-          const endDateISO = endDate.toISOString();
+          // Get the date strings directly from the dateRange state
+          const startDateString = dateRange.startString || dateRange.start.toISOString().split('T')[0];
+          const endDateString = dateRange.endString || dateRange.end.toISOString().split('T')[0];
           
-          console.log(`Fetching data for date range: ${startDateISO} to ${endDateISO}`);
+          console.log(`Fetching data for date range: ${startDateString} to ${endDateString}`);
           
           // Fetch real data from Supabase with date range filter and pagination
           let allData: any[] = [];
@@ -116,10 +120,8 @@ export const Dashboard: React.FC = () => {
             const { data, error } = await supabase
               .from('logs')
               .select('id, created_at, default_score, refusal_score, decision')
-              .not('default_score', 'is', null)
-              .not('refusal_score', 'is', null)
-              .gte('created_at', startDateISO)  // Greater than or equal to start date
-              .lte('created_at', endDateISO)    // Less than or equal to end date
+              .gte('created_at', startDateString)  // Greater than or equal to start date
+              .lte('created_at', endDateString)    // Less than (strictly) end date
               .order('created_at', { ascending: true })
               .range(from, to);
               
@@ -173,31 +175,31 @@ export const Dashboard: React.FC = () => {
     // we can simplify the client-side filtering logic
     
     // Helper function to parse Supabase timestamptz correctly
-    const parseSupabaseDate = (timestamptz: string): Date => {
-      // Ensure the timestamp has a timezone component
-      let timestamp = timestamptz;
-      if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
-        timestamp += 'Z';
-      }
-      return new Date(timestamp);
-    };
+    // const parseSupabaseDate = (timestamptz: string): Date => {
+    //   // Ensure the timestamp has a timezone component
+    //   let timestamp = timestamptz;
+    //   if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+    //     timestamp += 'Z';
+    //   }
+    //   return new Date(timestamp);
+    // };
     
-    // Log the date range we're using
+    // Log the date range we're using - use string representations for consistency
     console.log('Client-side date range:', {
-      start: dateRange.start.toLocaleDateString(),
-      end: dateRange.end.toLocaleDateString()
+      start: dateRange.startString || dateRange.start.toISOString().split('T')[0],
+      end: dateRange.endString || dateRange.end.toISOString().split('T')[0]
     });
     
     // Log a sample of the fetched loans
-    if (loans.length > 0) {
-      console.log('Sample of fetched loans:');
-      loans.slice(0, 3).forEach((loan, index) => {
-        console.log(`Loan ${index}:`, {
-          created_at: loan.created_at,
-          date: parseSupabaseDate(loan.created_at).toLocaleDateString()
-        });
-      });
-    }
+    // if (loans.length > 0) {
+    //   console.log('Sample of fetched loans:');
+    //   loans.slice(0, 3).forEach((loan, index) => {
+    //     console.log(`Loan ${index}:`, {
+    //       created_at: loan.created_at,
+    //       date: parseSupabaseDate(loan.created_at).toLocaleDateString()
+    //     });
+    //   });
+    // }
     
     console.log('Filtered loans count:', loans.length);
     
@@ -210,10 +212,10 @@ export const Dashboard: React.FC = () => {
   const historicalDecisions = useMemo(() => {
     const decisions = filteredLoans.map(loan => ({
       ...loan,
-      decision: loan.historical_decision || 'unknown'
+      decision: loan.historical_decision || 'n/a'
     }));
     console.log('Historical decisions:', decisions);
-    console.log('Historical decisions with known status:', decisions.filter(d => d.decision !== 'unknown').length);
+    console.log('Historical decisions with known status:', decisions.filter(d => d.decision !== 'n/a').length);
     return decisions;
   }, [filteredLoans]);
 
@@ -231,8 +233,8 @@ export const Dashboard: React.FC = () => {
     const total = currentDecisions.length;
     const accepted = currentDecisions.filter(loan => loan.decision === 'accept').length;
     const refused = currentDecisions.filter(loan => loan.decision === 'refuse').length;
-    const unknown = currentDecisions.filter(loan => loan.decision === 'unknown').length;
-    const acceptanceRate = (total - unknown) > 0 ? (accepted / (total - unknown)) * 100 : 0;
+    const unknown = currentDecisions.filter(loan => loan.decision === 'n/a').length;
+    const acceptanceRate = accepted / (total - unknown) * 100;
     
     console.log('Aggregate stats:', { total, accepted, refused, unknown, acceptanceRate });
     return { total, accepted, refused, unknown, acceptanceRate };
@@ -242,10 +244,12 @@ export const Dashboard: React.FC = () => {
     const monthlyData: { [key: string]: MonthlyStats } = {};
     
     currentDecisions.forEach(loan => {
-      if (loan.decision === 'unknown') return; // Skip unknown decisions for monthly stats
+      if (loan.decision === 'n/a') return; // Skip unknown decisions for monthly stats
       
-      const date = new Date(loan.created_at);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      // Extract year and month directly from the string without using Date objects
+      // This avoids any timezone issues
+      // Assuming created_at is in format like "2025-06-01T12:34:56.789Z" or "2025-06-01"
+      const monthKey = loan.created_at.substring(0, 7); // Gets "2025-06" from either format
       
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = {
@@ -253,6 +257,7 @@ export const Dashboard: React.FC = () => {
           total: 0,
           accepted: 0,
           refused: 0,
+          unknown: 0,
           acceptanceRate: 0
         };
       }
@@ -332,7 +337,7 @@ export const Dashboard: React.FC = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mb-4"></div>
             <p className="text-cyan-300 font-medium">Loading data...</p>
             <p className="text-gray-400 text-sm mt-2">
-              Fetching loans for {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+              Fetching loans for {dateRange.startString || dateRange.start.toISOString().split('T')[0]} - {dateRange.endString || dateRange.end.toISOString().split('T')[0]}
             </p>
           </div>
         </div>
@@ -356,7 +361,7 @@ export const Dashboard: React.FC = () => {
               <div className="text-right">
                 <p className="text-sm text-gray-400">Analysis Period</p>
                 <p className="text-sm font-medium text-gray-200">
-                  {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+                  {dateRange.startString || dateRange.start.toISOString().split('T')[0]} - {dateRange.endString || dateRange.end.toISOString().split('T')[0]}
                 </p>
               </div>
               <div className="text-right">
@@ -391,7 +396,7 @@ export const Dashboard: React.FC = () => {
             <p>Current view mode: {viewMode}</p>
             <p>Using mock data: {usingMockData ? 'Yes' : 'No'}</p>
             {viewMode === 'historical' && (
-              <p>Historical decisions with data: {historicalDecisions.filter(d => d.decision !== 'unknown').length}</p>
+              <p>Historical decisions with data: {historicalDecisions.filter(d => d.decision !== 'n/a').length}</p>
             )}
           </div>
         )}
