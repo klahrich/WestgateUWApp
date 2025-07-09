@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Calendar, 
-  Settings, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Settings,
   BarChart3,
   PieChart,
   Shield,
@@ -14,7 +14,8 @@ import {
   Zap,
   Database,
   Sliders,
-  TestTube
+  TestTube,
+  AlertCircle
 } from 'lucide-react';
 import { ThresholdControls } from './ThresholdControls';
 import { MetricsCard } from './MetricsCard';
@@ -234,7 +235,7 @@ export const Dashboard: React.FC = () => {
     const accepted = currentDecisions.filter(loan => loan.decision === 'accept').length;
     const refused = currentDecisions.filter(loan => loan.decision === 'refuse').length;
     const unknown = currentDecisions.filter(loan => loan.decision === 'n/a').length;
-    const acceptanceRate = accepted / (total - unknown) * 100;
+    const acceptanceRate = accepted / total * 100;
     
     console.log('Aggregate stats:', { total, accepted, refused, unknown, acceptanceRate });
     return { total, accepted, refused, unknown, acceptanceRate };
@@ -243,9 +244,7 @@ export const Dashboard: React.FC = () => {
   const monthlyStats = useMemo(() => {
     const monthlyData: { [key: string]: MonthlyStats } = {};
     
-    currentDecisions.forEach(loan => {
-      if (loan.decision === 'n/a') return; // Skip unknown decisions for monthly stats
-      
+    currentDecisions.forEach(loan => {      
       // Extract year and month directly from the string without using Date objects
       // This avoids any timezone issues
       // Assuming created_at is in format like "2025-06-01T12:34:56.789Z" or "2025-06-01"
@@ -456,7 +455,7 @@ export const Dashboard: React.FC = () => {
                   </p>
                   {!usingMockData && aggregateStats.unknown > 0 && (
                     <p className="text-xs text-amber-400 mt-2">
-                      Note: {aggregateStats.unknown} records have no decision data and are excluded from analysis.
+                      Note: {aggregateStats.unknown} records have no decision data and are considered as refusals in the analysis.
                     </p>
                   )}
                 </div>
@@ -632,7 +631,7 @@ export const Dashboard: React.FC = () => {
                       <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
                         <p className="text-xs text-amber-300 font-medium mb-1">Missing Data</p>
                         <p className="text-xs text-gray-400">
-                          {aggregateStats.unknown} records have no decision data and are excluded from analysis.
+                          {aggregateStats.unknown} records have no decision data and are considered as refusals in the analysis.
                         </p>
                       </div>
                     )}
@@ -647,8 +646,8 @@ export const Dashboard: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <MetricsCard
                   title="Total Loans"
-                  value={(aggregateStats.total - (viewMode === 'historical' ? aggregateStats.unknown : 0)).toLocaleString()}
-                  subtitle={viewMode === 'historical' && aggregateStats.unknown > 0 ? `${aggregateStats.unknown} excluded` : undefined}
+                  value={aggregateStats.total.toLocaleString()}
+                  subtitle={viewMode === 'historical' && aggregateStats.unknown > 0 ? `${aggregateStats.unknown} n/a included` : undefined}
                   icon={<BarChart3 className="h-5 w-5" />}
                   color="blue"
                 />
