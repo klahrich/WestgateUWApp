@@ -77,25 +77,38 @@ export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({
       <div className="text-sm text-gray-400 mb-4">
         This grid shows the Accept Rate for different threshold combinations.
         <br />
-        X-axis: Default Score Threshold, Y-axis: Refusal Score Threshold
+        X-axis: Credit Risk Threshold, Y-axis: Policy Threshold
         <br />
         <span className="text-cyan-400 font-medium">Click any cell to set thresholds and switch to Simulation Mode</span>
       </div>
       
-      <div className="relative overflow-x-auto">
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr>
-              <th className="p-2 bg-gray-800 sticky left-0 top-0 z-10 text-cyan-300 font-medium">
-                Default ↓ / Refusal →
-              </th>
-              {thresholds.map((threshold) => (
-                <th key={`header-${threshold}`} className="p-2 bg-gray-800 sticky top-0 text-cyan-300/80 font-medium">
-                  {threshold.toFixed(2)}
+      {/* X-axis label (Default) above the matrix */}
+      <div className="text-center mb-2">
+        <span className="text-cyan-300 font-medium">Credit Risk Threshold →</span>
+      </div>
+      
+      <div className="flex">
+        {/* Y-axis label (Refusal) to the left, rotated */}
+        <div className="flex items-center mr-2">
+          <div className="transform -rotate-90 origin-center whitespace-nowrap text-cyan-300 font-medium">
+            ← Policy Fit Threshold
+          </div>
+        </div>
+        
+        <div className="relative overflow-x-auto flex-grow">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr>
+                <th className="p-2 bg-gray-800 sticky left-0 top-0 z-10 text-cyan-300 font-medium">
+                  {/* Empty corner cell */}
                 </th>
-              ))}
-            </tr>
-          </thead>
+                {thresholds.map((threshold) => (
+                  <th key={`header-${threshold}`} className="p-2 bg-gray-800 sticky top-0 text-cyan-300/80 font-medium">
+                    {threshold.toFixed(2)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
           <tbody>
             {matrixData.map((row, rowIndex) => (
               <tr key={`row-${rowIndex}`}>
@@ -121,6 +134,7 @@ export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
       
       <div className="mt-6 flex items-center justify-center">

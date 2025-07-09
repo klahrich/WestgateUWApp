@@ -172,35 +172,12 @@ export const Dashboard: React.FC = () => {
   }, [dateRange]); // Re-fetch when date range changes
 
   const filteredLoans = useMemo(() => {
-    // Since we're now filtering on the server side with the Supabase query,
-    // we can simplify the client-side filtering logic
-    
-    // Helper function to parse Supabase timestamptz correctly
-    // const parseSupabaseDate = (timestamptz: string): Date => {
-    //   // Ensure the timestamp has a timezone component
-    //   let timestamp = timestamptz;
-    //   if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
-    //     timestamp += 'Z';
-    //   }
-    //   return new Date(timestamp);
-    // };
     
     // Log the date range we're using - use string representations for consistency
     console.log('Client-side date range:', {
       start: dateRange.startString || dateRange.start.toISOString().split('T')[0],
       end: dateRange.endString || dateRange.end.toISOString().split('T')[0]
     });
-    
-    // Log a sample of the fetched loans
-    // if (loans.length > 0) {
-    //   console.log('Sample of fetched loans:');
-    //   loans.slice(0, 3).forEach((loan, index) => {
-    //     console.log(`Loan ${index}:`, {
-    //       created_at: loan.created_at,
-    //       date: parseSupabaseDate(loan.created_at).toLocaleDateString()
-    //     });
-    //   });
-    // }
     
     console.log('Filtered loans count:', loans.length);
     
