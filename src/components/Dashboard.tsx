@@ -150,8 +150,8 @@ export const Dashboard: React.FC = () => {
           const transformedLoans: LoanData[] = allData.map(record => ({
             id: record.id.toString(),
             created_at: record.created_at,
-            default_score: record.default_score || 0,
-            refusal_score: record.refusal_score || 0,
+            default_score: record.default_score ?? 1,
+            refusal_score: record.refusal_score ?? 1,
             historical_decision: record.decision || undefined
           }));
 

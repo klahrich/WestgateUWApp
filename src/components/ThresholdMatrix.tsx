@@ -41,8 +41,8 @@ export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({
         // Count accepted loans for this threshold pair
         const acceptedCount = loans.filter(
           (loan) => 
-            loan.default_score <= defaultThreshold && 
-            loan.refusal_score <= refusalThreshold
+            loan.default_score < defaultThreshold && 
+            loan.refusal_score < refusalThreshold
         ).length;
         
         // Calculate accept rate
@@ -77,21 +77,21 @@ export const ThresholdMatrix: React.FC<ThresholdMatrixProps> = ({
       <div className="text-sm text-gray-400 mb-4">
         This grid shows the Accept Rate for different threshold combinations.
         <br />
-        X-axis: Credit Risk Threshold, Y-axis: Policy Threshold
+        X-axis: , Y-axis: Credit Risk Threshold
         <br />
         <span className="text-cyan-400 font-medium">Click any cell to set thresholds and switch to Simulation Mode</span>
       </div>
       
       {/* X-axis label (Default) above the matrix */}
       <div className="text-center mb-2">
-        <span className="text-cyan-300 font-medium">Credit Risk Threshold →</span>
+        <span className="text-cyan-300 font-medium">Policy Fit Threshold →</span>
       </div>
       
       <div className="flex">
         {/* Y-axis label (Refusal) to the left, rotated */}
         <div className="flex items-center mr-2">
           <div className="transform -rotate-90 origin-center whitespace-nowrap text-cyan-300 font-medium">
-            ← Policy Fit Threshold
+            ← Credit Risk Threshold
           </div>
         </div>
         
