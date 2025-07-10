@@ -62,3 +62,27 @@ The main table used is `logs` in Supabase, with the following relevant columns:
 - **Date Handling**: Initial issues with date filtering were resolved by implementing server-side filtering in the Supabase query using ISO 8601 formatted dates (`gte`, `lte`) and ensuring the date range includes the full start and end days. Pagination was added to overcome the default Supabase record limit. The `DateRangePicker` was enhanced with individual selectors to address the native date picker's behavior of auto-selecting a day when the month changes.
 - **Loading States**: Two distinct loading states (`loading` and `dataRefreshing`) were introduced to differentiate between the initial full-page load and subsequent data fetches (like changing the date range), allowing for different visual feedback mechanisms (full-screen loader vs. subtle overlay/cursor).
 - **Threshold Grid Interaction**: The decision to make grid cells clickable provides a direct and intuitive way for users to explore the impact of different thresholds and immediately see the results in the Simulation mode, enhancing the analytical workflow. Highlighting the selected cell provides clear visual context.
+
+## 8. Authentication System (Added 2025-07-09)
+
+A login system has been implemented to restrict access to the dashboard, ensuring only authorized users can view the analytics data:
+
+- **Login Screen**: A new login page requires users to enter valid credentials before accessing the dashboard.
+- **Authentication Flow**:
+  - Credentials are validated against environment variables (VITE_USERNAME and VITE_PASSWORD)
+  - Default fallback credentials (admin/password) are used if environment variables aren't set
+  - Authentication state is persisted in localStorage, allowing users to remain logged in between sessions
+  - A logout button in the top-right corner allows users to securely log out
+
+### Key Files Added/Modified:
+
+- [`src/components/Login.tsx`](src/components/Login.tsx): New component that renders the login form, handles credential validation, and provides feedback on authentication attempts.
+- [`src/App.tsx`](src/App.tsx): Modified to implement authentication state management and conditionally render either the Login component or Dashboard based on authentication status.
+- [`.env`](.env): Added to store username and password credentials (included in .gitignore for security).
+
+### Design Decisions:
+
+- **Simple Authentication**: Implemented a straightforward username/password authentication system as requested, with credentials stored in environment variables.
+- **Persistent Sessions**: Used localStorage to maintain authentication state between page refreshes, improving user experience.
+- **Security Considerations**: Ensured .env file is included in .gitignore to prevent credential exposure in version control.
+- **Consistent UI**: Styled the login screen to match the existing dashboard aesthetic, using the same color scheme and visual language.
