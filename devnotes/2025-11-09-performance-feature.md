@@ -67,3 +67,22 @@ Since this is a development-time issue, the standard solution is to use a proxy.
 This change makes the browser send the request to the Vite server (the same origin), which then forwards it to the actual endpoint. This completely resolves the CORS issue for the local development environment.
 
 **Important Note**: For these changes to take effect, the Vite development server must be restarted after modifying `vite.config.ts`.
+
+## 4. Handling Production vs. Development Environments
+
+The Vite proxy is a development-only feature. To ensure the application works in both development (with the proxy) and production (deployed on a server), we need to use different URLs for the API call.
+
+Vite provides built-in environment variables to handle this:
+- `import.meta.env.DEV`: Is `true` when running the `npm run dev` command.
+- `import.meta.env.PROD`: Is `true` when running the `npm run build` command.
+
+The code in `PerformanceDashboard.tsx` was updated to use these variables to select the correct URL:
+
+```typescript
+const baseUrl = import.meta.env.PROD
+  ? 'https://webhookazurefunctionwestgate.azurewebsites.net'
+  : '';
+const response = await fetch(`${baseUrl}/api/GetMugaPerformanceFundedRequests?code=${code}`);
+```
+
+This ensures that the application calls the full, live URL in production and the local, proxied path in development, resolving the 404 error in the deployed environment.

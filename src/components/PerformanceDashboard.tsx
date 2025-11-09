@@ -25,7 +25,10 @@ export const PerformanceDashboard: React.FC = () => {
           throw new Error('Azure Function code is not defined in environment variables.');
         }
 
-        const response = await fetch(`/api/GetMugaPerformanceFundedRequests?code=${code}`);
+        const baseUrl = import.meta.env.PROD
+          ? 'https://webhookazurefunctionwestgate.azurewebsites.net'
+          : '';
+        const response = await fetch(`${baseUrl}/api/GetMugaPerformanceFundedRequests?code=${code}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch data: ${response.statusText}`);
         }
