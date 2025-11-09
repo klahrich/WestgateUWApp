@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line } from 'recharts';
 
 interface PerformanceData {
   LoanReleasedYearMonth: string;
@@ -85,50 +85,67 @@ export const PerformanceDashboard: React.FC = () => {
     return <div>Error: {error}</div>;
   }
 
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="p-4 bg-gray-800 text-white rounded-md border border-gray-700">
+          <p className="label font-bold">{`${label}`}</p>
+          <p style={{ color: '#8884d8' }}>{`3M Repayment % : ${payload[0].value.toFixed(2)}%`}</p>
+          <p style={{ color: '#82ca9d' }}>{`6M Repayment % : ${payload[1].value.toFixed(2)}%`}</p>
+          <p style={{ color: '#ffc658' }}>{`12M Repayment % : ${payload[2].value.toFixed(2)}%`}</p>
+          <p style={{ color: 'rgba(136, 132, 216, 0.6)' }}>{`Accepted Principal : ${payload[3].payload.acceptedPrincipal.toLocaleString()}`}</p>
+          <p style={{ color: 'rgba(130, 202, 157, 0.6)' }}>{`Refused Principal : ${payload[3].payload.refusedPrincipal.toLocaleString()}`}</p>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Performance Dashboard</h1>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="month" />
-          <YAxis yAxisId="left" />
-          <YAxis yAxisId="right" orientation="right" />
-          <Tooltip />
-          <Legend />
-          <Line yAxisId="left" type="monotone" dataKey="repaymentRate3M" stroke="#8884d8" name="3M Repayment %" />
-          <Line yAxisId="left" type="monotone" dataKey="repaymentRate6M" stroke="#82ca9d" name="6M Repayment %" />
-          <Line yAxisId="left" type="monotone" dataKey="repaymentRate12M" stroke="#ffc658" name="12M Repayment %" />
-          <Bar yAxisId="right" dataKey="acceptedPrincipal" stackId="a" fill="#8884d8" name="Accepted Principal" />
-          <Bar yAxisId="right" dataKey="refusedPrincipal" stackId="a" fill="#82ca9d" name="Refused Principal" />
-        </LineChart>
+    <div className="p-4 text-white">
+      <h1 className="text-2xl font-bold mb-4 text-white">Performance Dashboard</h1>
+      <ResponsiveContainer width="100%" height={600}>
+        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 30, bottom: 30 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+          <XAxis dataKey="month" tick={{ fill: '#A0AEC0' }} label={{ value: 'Loan Release Month', position: 'insideBottom', offset: -15, fill: '#A0AEC0' }} />
+          <YAxis yAxisId="left" tickFormatter={(tick) => `${tick}%`} tick={{ fill: '#A0AEC0' }} label={{ value: 'Repayment %', angle: -90, position: 'insideLeft', offset: -10, fill: '#A0AEC0' }} />
+          <YAxis yAxisId="right" orientation="right" tickFormatter={(tick) => `${(tick / 1000)}k`} tick={{ fill: '#A0AEC0' }} label={{ value: 'Loan Principal Amount', angle: 90, position: 'insideRight', offset: -10, fill: '#A0AEC0' }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend verticalAlign="top" wrapperStyle={{ color: '#A0AEC0', paddingBottom: '10px' }} />
+          <Bar yAxisId="right" dataKey="acceptedPrincipal" stackId="a" fill="rgba(136, 132, 216, 0.6)" name="Accepted Principal" />
+          <Bar yAxisId="right" dataKey="refusedPrincipal" stackId="a" fill="rgba(130, 202, 157, 0.6)" name="Refused Principal" />
+          <Line yAxisId="left" type="monotone" dataKey="repaymentRate3M" stroke="#8884d8" strokeWidth={2} name="3M Repayment %" />
+          <Line yAxisId="left" type="monotone" dataKey="repaymentRate6M" stroke="#82ca9d" strokeWidth={2} name="6M Repayment %" />
+          <Line yAxisId="left" type="monotone" dataKey="repaymentRate12M" stroke="#ffc658" strokeWidth={2} name="12M Repayment %" />
+        </ComposedChart>
       </ResponsiveContainer>
 
       <div className="mt-8">
-        <h2 className="text-xl font-bold mb-4">Raw Data</h2>
+        <h2 className="text-xl font-bold mb-4 text-white">Raw Data</h2>
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white">
+          <table className="min-w-full bg-gray-800 text-white">
             <thead>
-              <tr>
-                <th className="py-2 px-4 border-b">Month</th>
-                <th className="py-2 px-4 border-b">Accepted Principal</th>
-                <th className="py-2 px-4 border-b">Refused Principal</th>
-                <th className="py-2 px-4 border-b">Total Principal</th>
-                <th className="py-2 px-4 border-b">3M Repayment %</th>
-                <th className="py-2 px-4 border-b">6M Repayment %</th>
-                <th className="py-2 px-4 border-b">12M Repayment %</th>
+              <tr className="bg-gray-700">
+                <th className="py-2 px-4 border-b border-gray-600">Month</th>
+                <th className="py-2 px-4 border-b border-gray-600">Accepted Principal</th>
+                <th className="py-2 px-4 border-b border-gray-600">Refused Principal</th>
+                <th className="py-2 px-4 border-b border-gray-600">Total Principal</th>
+                <th className="py-2 px-4 border-b border-gray-600">3M Repayment %</th>
+                <th className="py-2 px-4 border-b border-gray-600">6M Repayment %</th>
+                <th className="py-2 px-4 border-b border-gray-600">12M Repayment %</th>
               </tr>
             </thead>
             <tbody>
-              {chartData.map(item => (
-                <tr key={item.month}>
-                  <td className="py-2 px-4 border-b">{item.month}</td>
-                  <td className="py-2 px-4 border-b">{item.acceptedPrincipal.toLocaleString()}</td>
-                  <td className="py-2 px-4 border-b">{item.refusedPrincipal.toLocaleString()}</td>
-                  <td className="py-2 px-4 border-b">{item.totalPrincipal.toLocaleString()}</td>
-                  <td className="py-2 px-4 border-b">{item.repaymentRate3M.toFixed(2)}%</td>
-                  <td className="py-2 px-4 border-b">{item.repaymentRate6M.toFixed(2)}%</td>
-                  <td className="py-2 px-4 border-b">{item.repaymentRate12M.toFixed(2)}%</td>
+              {chartData.map((item, index) => (
+                <tr key={item.month} className={index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-700'}>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.month}</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.acceptedPrincipal.toLocaleString()}</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.refusedPrincipal.toLocaleString()}</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.totalPrincipal.toLocaleString()}</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate3M.toFixed(1)}%</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate6M.toFixed(1)}%</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate12M.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
