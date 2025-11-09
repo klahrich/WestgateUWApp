@@ -86,3 +86,16 @@ A login system has been implemented to restrict access to the dashboard, ensurin
 - **Persistent Sessions**: Used localStorage to maintain authentication state between page refreshes, improving user experience.
 - **Security Considerations**: Ensured .env file is included in .gitignore to prevent credential exposure in version control.
 - **Consistent UI**: Styled the login screen to match the existing dashboard aesthetic, using the same color scheme and visual language.
+
+## How it works
+
+The application follows a standard React-based architecture. Here's a breakdown of the workflow:
+
+1.  **Initialization**: The application starts by rendering the `App` component.
+2.  **Authentication**: The `App` component checks for an authentication token in `localStorage`. If a token is found, it renders the `Dashboard` component; otherwise, it displays the `Login` component.
+3.  **Data Fetching**: Once the `Dashboard` component is rendered, it fetches loan data from the Supabase backend. The data is filtered by the selected date range.
+4.  **State Management**: The `Dashboard` component manages the application's state, including the current view mode, date range, and risk thresholds.
+5.  **User Interaction**: Users can interact with the dashboard by changing the view mode, adjusting the date range, or modifying the risk thresholds.
+6.  **Data Visualization**: The application uses various components to visualize the data, including `MetricsCard`, `MonthlyChart`, and `StatsTable`.
+7.  **Simulation**: In "Simulation Mode," the application recalculates the loan decisions based on the user-defined risk thresholds.
+8.  **Threshold Grid**: The "Threshold Grid" provides a visual representation of how different threshold combinations affect the acceptance rate.
