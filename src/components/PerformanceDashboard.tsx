@@ -87,14 +87,19 @@ export const PerformanceDashboard: React.FC = () => {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const repayment3M = payload.find(p => p.dataKey === 'repaymentRate3M');
+      const repayment6M = payload.find(p => p.dataKey === 'repaymentRate6M');
+      const repayment12M = payload.find(p => p.dataKey === 'repaymentRate12M');
+      const acceptedPrincipal = payload.find(p => p.dataKey === 'acceptedPrincipal');
+
       return (
         <div className="p-4 bg-gray-800 text-white rounded-md border border-gray-700">
           <p className="label font-bold">{`${label}`}</p>
-          <p style={{ color: '#8884d8' }}>{`3M Repayment % : ${payload[0].value.toFixed(2)}%`}</p>
-          <p style={{ color: '#82ca9d' }}>{`6M Repayment % : ${payload[1].value.toFixed(2)}%`}</p>
-          <p style={{ color: '#ffc658' }}>{`12M Repayment % : ${payload[2].value.toFixed(2)}%`}</p>
-          <p style={{ color: 'rgba(136, 132, 216, 0.6)' }}>{`Accepted Principal : ${payload[3].payload.acceptedPrincipal.toLocaleString()}`}</p>
-          <p style={{ color: 'rgba(130, 202, 157, 0.6)' }}>{`Refused Principal : ${payload[3].payload.refusedPrincipal.toLocaleString()}`}</p>
+          {repayment3M && <p style={{ color: repayment3M.stroke }}>{`3M Repayment % : ${repayment3M.value.toFixed(2)}%`}</p>}
+          {repayment6M && <p style={{ color: repayment6M.stroke }}>{`6M Repayment % : ${repayment6M.value.toFixed(2)}%`}</p>}
+          {repayment12M && <p style={{ color: repayment12M.stroke }}>{`12M Repayment % : ${repayment12M.value.toFixed(2)}%`}</p>}
+          {acceptedPrincipal && <p style={{ color: 'rgba(136, 132, 216, 0.6)' }}>{`Accepted Principal : ${acceptedPrincipal.payload.acceptedPrincipal.toLocaleString()}`}</p>}
+          {acceptedPrincipal && <p style={{ color: 'rgba(130, 202, 157, 0.6)' }}>{`Refused Principal : ${acceptedPrincipal.payload.refusedPrincipal.toLocaleString()}`}</p>}
         </div>
       );
     }
