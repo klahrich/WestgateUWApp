@@ -14,10 +14,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     
     // Get credentials from environment variables
     // In a real app, these would be securely stored and not exposed to the client
-    const correctUsername = import.meta.env.VITE_USERNAME || 'admin';
-    const correctPassword = import.meta.env.VITE_PASSWORD || 'password';
-    
-    if (username === correctUsername && password === correctPassword) {
+    const users = [
+      {
+        username: import.meta.env.VITE_USERNAME || 'admin',
+        password: import.meta.env.VITE_PASSWORD || 'password',
+      },
+      {
+        username: import.meta.env.VITE_USERNAME_2,
+        password: import.meta.env.VITE_PASSWORD_2,
+      },
+    ];
+
+    const foundUser = users.find(
+      (user) => user.username === username && user.password === password
+    );
+
+    if (foundUser) {
       setError('');
       onLogin(true);
     } else {

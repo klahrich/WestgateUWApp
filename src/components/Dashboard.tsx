@@ -25,7 +25,7 @@ import { StatsTable } from './StatsTable';
 import { supabase, LoanRecord } from '../lib/supabase';
 import { USE_MOCK_DATA, generateMockData } from '../config/dataSource';
 import { ThresholdMatrix } from './ThresholdMatrix';
-import { UWPerformance } from './UWPerformance';
+import { PerformanceDashboard } from './PerformanceDashboard';
 
 interface LoanData {
   id: string;
@@ -44,7 +44,7 @@ interface MonthlyStats {
   acceptanceRate: number;
 }
 
-type ViewMode = 'historical' | 'simulation' | 'threshold-grid' | 'uw-performance';
+type ViewMode = 'historical' | 'simulation' | 'threshold-grid' | 'performance';
 
 export const Dashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('historical');
@@ -418,15 +418,15 @@ export const Dashboard: React.FC = () => {
               <PieChart className="h-3 w-3 opacity-70" />
             </button>
             <button
-              onClick={() => setViewMode('uw-performance')}
+              onClick={() => setViewMode('performance')}
               className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
-                viewMode === 'uw-performance'
+                viewMode === 'performance'
                   ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white shadow-lg'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
               }`}
             >
               <TrendingUp className="h-4 w-4" />
-              <span className="font-medium">UW Performance</span>
+              <span className="font-medium">Performance</span>
             </button>
           </div>
           
@@ -474,24 +474,24 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
             )}
-            {viewMode === 'uw-performance' && (
-                <div className="flex items-start space-x-3">
-                    <div className="bg-green-500/10 p-2 rounded-lg border border-green-500/20">
-                        <TrendingUp className="h-4 w-4 text-green-400" />
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-medium text-green-400 mb-1">UW Performance Analysis</h3>
-                        <p className="text-xs text-gray-400 leading-relaxed">
-                            Analyzing underwriting performance data from the SQL Server database.
-                        </p>
-                    </div>
+            {viewMode === 'performance' && (
+              <div className="flex items-start space-x-3">
+                <div className="bg-green-500/10 p-2 rounded-lg border border-green-500/20">
+                  <TrendingUp className="h-4 w-4 text-green-400" />
                 </div>
+                <div>
+                  <h3 className="text-sm font-medium text-green-400 mb-1">Performance Analysis</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Analyzing the repayment performance of historical loan cohorts.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        {viewMode === 'uw-performance' ? (
-            <UWPerformance />
+        {viewMode === 'performance' ? (
+          <PerformanceDashboard />
         ) : viewMode === 'threshold-grid' ? (
           /* Threshold Grid View */
           <div className="space-y-6">
