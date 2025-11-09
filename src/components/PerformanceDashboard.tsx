@@ -70,12 +70,27 @@ export const PerformanceDashboard: React.FC = () => {
     return acc;
   }, {} as Record<string, any>);
 
-  const chartData = Object.values(processedData).map(item => ({
-    ...item,
-    repaymentRate3M: item.totalPrincipal > 0 ? (item.repayment3M / item.totalPrincipal) * 100 : 0,
-    repaymentRate6M: item.totalPrincipal > 0 ? (item.repayment6M / item.totalPrincipal) * 100 : 0,
-    repaymentRate12M: item.totalPrincipal > 0 ? (item.repayment12M / item.totalPrincipal) * 100 : 0,
-  }));
+  const chartData = Object.values(processedData).map(item => {
+    const today = new Date();
+    const itemDate = new Date(item.month);
+
+    const addMonths = (date: Date, months: number) => {
+      const d = new Date(date);
+      d.setMonth(d.getMonth() + months);
+      return d;
+    };
+
+    const repaymentRate3M = addMonths(itemDate, 3) > today ? null : item.totalPrincipal > 0 ? (item.repayment3M / item.totalPrincipal) * 100 : 0;
+    const repaymentRate6M = addMonths(itemDate, 6) > today ? null : item.totalPrincipal > 0 ? (item.repayment6M / item.totalPrincipal) * 100 : 0;
+    const repaymentRate12M = addMonths(itemDate, 12) > today ? null : item.totalPrincipal > 0 ? (item.repayment12M / item.totalPrincipal) * 100 : 0;
+
+    return {
+      ...item,
+      repaymentRate3M,
+      repaymentRate6M,
+      repaymentRate12M,
+    };
+  });
 
   if (loading) {
     return <div>Loading...</div>;
@@ -87,19 +102,15 @@ export const PerformanceDashboard: React.FC = () => {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const repayment3M = payload.find(p => p.dataKey === 'repaymentRate3M');
-      const repayment6M = payload.find(p => p.dataKey === 'repaymentRate6M');
-      const repayment12M = payload.find(p => p.dataKey === 'repaymentRate12M');
-      const acceptedPrincipal = payload.find(p => p.dataKey === 'acceptedPrincipal');
-
+      const data = payload[0].payload;
       return (
         <div className="p-4 bg-gray-800 text-white rounded-md border border-gray-700">
           <p className="label font-bold">{`${label}`}</p>
-          {repayment3M && <p style={{ color: repayment3M.stroke }}>{`3M Repayment % : ${repayment3M.value.toFixed(2)}%`}</p>}
-          {repayment6M && <p style={{ color: repayment6M.stroke }}>{`6M Repayment % : ${repayment6M.value.toFixed(2)}%`}</p>}
-          {repayment12M && <p style={{ color: repayment12M.stroke }}>{`12M Repayment % : ${repayment12M.value.toFixed(2)}%`}</p>}
-          {acceptedPrincipal && <p style={{ color: 'rgba(136, 132, 216, 0.6)' }}>{`Accepted Principal : ${acceptedPrincipal.payload.acceptedPrincipal.toLocaleString()}`}</p>}
-          {acceptedPrincipal && <p style={{ color: 'rgba(130, 202, 157, 0.6)' }}>{`Refused Principal : ${acceptedPrincipal.payload.refusedPrincipal.toLocaleString()}`}</p>}
+          <p style={{ color: '#8884d8' }}>{`3M Repayment % : ${data.repaymentRate3M !== null ? `${data.repaymentRate3M.toFixed(2)}%` : 'N/A'}`}</p>
+          <p style={{ color: '#82ca9d' }}>{`6M Repayment % : ${data.repaymentRate6M !== null ? `${data.repaymentRate6M.toFixed(2)}%` : 'N/A'}`}</p>
+          <p style={{ color: '#ffc658' }}>{`12M Repayment % : ${data.repaymentRate12M !== null ? `${data.repaymentRate12M.toFixed(2)}%` : 'N/A'}`}</p>
+          <p style={{ color: 'rgba(136, 132, 216, 0.6)' }}>{`Accepted Principal : ${data.acceptedPrincipal.toLocaleString()}`}</p>
+          <p style={{ color: 'rgba(130, 202, 157, 0.6)' }}>{`Refused Principal : ${data.refusedPrincipal.toLocaleString()}`}</p>
         </div>
       );
     }
@@ -148,9 +159,9 @@ export const PerformanceDashboard: React.FC = () => {
                   <td className="py-2 px-4 border-b border-gray-600">{item.acceptedPrincipal.toLocaleString()}</td>
                   <td className="py-2 px-4 border-b border-gray-600">{item.refusedPrincipal.toLocaleString()}</td>
                   <td className="py-2 px-4 border-b border-gray-600">{item.totalPrincipal.toLocaleString()}</td>
-                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate3M.toFixed(1)}%</td>
-                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate6M.toFixed(1)}%</td>
-                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate12M.toFixed(1)}%</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate3M !== null ? `${item.repaymentRate3M.toFixed(1)}%` : 'N/A'}</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate6M !== null ? `${item.repaymentRate6M.toFixed(1)}%` : 'N/A'}</td>
+                  <td className="py-2 px-4 border-b border-gray-600">{item.repaymentRate12M !== null ? `${item.repaymentRate12M.toFixed(1)}%` : 'N/A'}</td>
                 </tr>
               ))}
             </tbody>
