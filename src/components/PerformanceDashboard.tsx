@@ -28,7 +28,7 @@ export const PerformanceDashboard: React.FC = () => {
         const baseUrl = import.meta.env.PROD
           ? 'https://webhookazurefunctionwestgate.azurewebsites.net'
           : '';
-        const response = await fetch(`${baseUrl}/api/GetMugaPerformanceFundedRequests?code=${code}`);
+        const response = await fetch(`${baseUrl}/api/MugaPerformanceFundedRequests?code=${code}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch data: ${response.statusText}`);
         }
